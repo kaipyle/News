@@ -662,6 +662,7 @@ function closeSheet() {
   sheet.dataset.kind = '';
   document.body.style.overflow = '';
   state.lastFocus?.focus?.();
+  applyPendingIfIdle();
 }
 
 function filtersBody() {
@@ -739,7 +740,7 @@ function openHelp() {
     <p><span class="now">Ao vivo</span> cobertura em tempo real (o tema <strong>Última hora</strong> mostra só as últimas 3 horas). <span class="tag">Opinião</span> coluna, editorial ou análise. <span class="pay">${icon('lock')}</span> o veículo cobra assinatura.</p>
     <p>Reuters e AP não têm feed público: os títulos chegam pelo Google Notícias, sem autor. The Economist não assina textos por política própria.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Atualização</h3>
-    <p>As fontes são lidas a cada 15 minutos. Última coleta: ${esc(updated)}. Quando chegam matérias novas, um aviso aparece no topo.</p>
+    <p>As fontes são lidas a cada 15 minutos. Última coleta: ${esc(updated)}. A lista se atualiza sozinha; para buscar na hora, puxe a tela para baixo no topo.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Minhas assinaturas</h3>
     <p>No <strong>menu</strong> (botão ☰ no topo), toque em <strong>Ocultar pagos</strong> para esconder os jornais pagos que você não assina; toque de novo para mostrar todos. Ele fica ligado até você desligar, em qualquer aba ou tema. Para dizer quais jornais você assina, use o botão <strong>Assinaturas</strong> do aviso, a seção no topo dos <strong>Filtros</strong> ou a aba <strong>Fontes</strong>. Fica salvo neste aparelho: no computador e no celular a escolha é feita separadamente.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Tradução</h3>
@@ -848,7 +849,6 @@ document.addEventListener('click', (ev) => {
       if (state.route.q) go({ q: '' }, { replace: true });
       requestAnimationFrame(measureHead);
       return;
-    case 'apply-fresh': return applyPending();
   }
 });
 
@@ -971,7 +971,7 @@ function closeMenu() {
   $('.top .menu-btn').setAttribute('aria-expanded', 'false');
   document.body.style.overflow = '';
   clearTimeout(menuTimer);
-  menuTimer = setTimeout(() => { menu.hidden = true; }, 230);
+  menuTimer = setTimeout(() => { menu.hidden = true; applyPendingIfIdle(); }, 230);
 }
 
 let toastTimer;
@@ -1029,58 +1029,39 @@ async function checkFresh() {
     const meta = await (await fresh('data/meta.json')).json();
     if (meta.updatedAt <= (state.pending?.updatedAt || state.data.updatedAt)) return;
     const data = await (await fresh('data/feed.json')).json();
-    const known = new Set(state.data.articles.map((a) => a.id));
-    const fresh = data.articles.filter((a) => !known.has(a.id) && inView(a, state.route.view)).length;
-    const sheetOpen = !$('#sheet').hidden;
-    if (!fresh || (window.scrollY < 120 && !sheetOpen)) {
-      ingest(data);
-      render();
-      return;
-    }
+    // atualiza em silêncio; se o leitor estiver no meio da lista, espera ele voltar ao topo
     state.pending = data;
-    const pill = $('.fresh');
-    pill.textContent = `${plural(fresh, 'matéria nova', 'matérias novas')}`;
-    pill.hidden = false;
+    applyPendingIfIdle();
   } catch {}
 }
+
+const idle = () => window.scrollY < 120 && $('#sheet').hidden && $('#menu').hidden;
 
 function applyPending() {
   if (!state.pending) return;
   ingest(state.pending);
   state.pending = null;
-  $('.fresh').hidden = true;
   state.limit = 30;
   render();
-  window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
+
+function applyPendingIfIdle() {
+  if (state.pending && idle()) applyPending();
+}
+window.addEventListener('scroll', () => { if (state.pending) applyPendingIfIdle(); }, { passive: true });
 
 // ───────────────────────── Puxar para atualizar ─────────────────────────
 
+// Sem avisos: se houver matéria nova a lista muda; se o app mudou, ele recarrega.
 async function refreshNow() {
   try {
     const v = await readVersion();
-    if (v && state.appVersion && v !== state.appVersion) {
-      location.reload(); // versão nova do app: recarrega para pegar o código novo
-      return null;
-    }
+    if (v && state.appVersion && v !== state.appVersion) return location.reload();
     const meta = await (await fresh('data/meta.json')).json();
-    if (meta.updatedAt <= state.data.updatedAt) {
-      if (state.pending) { applyPending(); return null; }
-      return `Nada novo desde ${fmtTime.format(state.data.updatedAt)}. As fontes são lidas a cada 15 minutos.`;
-    }
-    const data = await (await fresh('data/feed.json')).json();
-    const known = new Set(state.data.articles.map((a) => a.id));
-    const n = data.articles.filter((a) => !known.has(a.id)).length;
-    state.pending = null;
-    $('.fresh').hidden = true;
-    ingest(data);
+    if (meta.updatedAt > (state.pending?.updatedAt || state.data.updatedAt)) state.pending = await (await fresh('data/feed.json')).json();
     state.lastCheck = Date.now();
-    state.limit = 30;
-    render();
-    return n ? `${plural(n, 'matéria nova', 'matérias novas')}` : 'Notícias atualizadas';
-  } catch {
-    return navigator.onLine ? 'Não foi possível atualizar agora. Tente de novo.' : 'Sem conexão. Mostrando a última atualização salva.';
-  }
+    applyPending();
+  } catch {}
 }
 
 const PTR_TRIGGER = 72, PTR_MAX = 120;
@@ -1114,11 +1095,10 @@ async function runPull() {
   ptrEl.style.transform = `translateY(${PTR_TRIGGER * 0.8}px)`;
   main.style.transform = `translateY(${PTR_TRIGGER * 0.36}px)`;
   const t0 = Date.now();
-  const msg = await refreshNow();
+  await refreshNow();
   await new Promise((r) => setTimeout(r, Math.max(0, 600 - (Date.now() - t0)))); // o giro precisa ser visto
   state.refreshing = false;
   resetPull();
-  if (msg) toast(msg);
 }
 
 document.addEventListener('touchstart', (e) => {

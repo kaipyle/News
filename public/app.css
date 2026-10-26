@@ -253,14 +253,6 @@ main { max-width: var(--col); margin: 0 auto; padding: 0 var(--gutter) 40px; out
 .ptr.is-loading svg { animation: ptr-spin .75s linear infinite; }
 @keyframes ptr-spin { to { transform: rotate(360deg); } }
 
-.fresh {
-  position: fixed; z-index: 25; left: 50%; transform: translateX(-50%);
-  top: calc(var(--top-h) + env(safe-area-inset-top, 0px) + 56px);
-  background: var(--ink); color: var(--paper); border-radius: 20px; height: 36px; padding: 0 16px;
-  font: 600 13.5px/36px var(--sans); box-shadow: 0 6px 20px rgb(0 0 0 / .18);
-  display: flex; align-items: center; gap: 6px;
-}
-.fresh::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--tally); }
 
 .toast {
   position: fixed; z-index: 45; left: 50%; transform: translateX(-50%);
@@ -539,7 +531,6 @@ main { max-width: var(--col); margin: 0 auto; padding: 0 var(--gutter) 40px; out
   .tabs-top .tab svg { display: none; }
   .tabs-top .tab[aria-current="page"] { border-bottom-color: var(--ink); }
   .brand { margin-right: 0; }
-  .fresh { top: calc(var(--top-h) + 60px); }
   main.wide { max-width: 1240px; }
   main.wide .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 28px; align-items: start; }
   main.wide .col-head.lane-e { border-bottom-color: var(--left); }
