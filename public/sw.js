@@ -1,5 +1,5 @@
 // Service worker: abre o app sem rede e guarda a última coleta de notícias.
-const VERSION = 'mirante-v5';
+const VERSION = 'mirante-v6';
 const SHELL = [
   './', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
@@ -24,14 +24,16 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
 
   // Notícias e páginas: rede primeiro, cópia salva quando não houver conexão.
-  if (url.pathname.includes('/data/') || e.request.mode === 'navigate' || /\.(html|js|css)$/.test(url.pathname)) {
+  if (url.pathname.includes('/data/') || url.pathname.endsWith('version.json') || e.request.mode === 'navigate' || /\.(html|js|css)$/.test(url.pathname)) {
+    // o app pede as notícias com "?t=..." para furar o cache do site; a cópia offline fica numa chave só
+    const key = url.search ? new Request(url.origin + url.pathname) : e.request;
     e.respondWith(
       fetch(e.request)
         .then((res) => {
-          if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); }
+          if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(key, copy)); }
           return res;
         })
-        .catch(() => caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || caches.match('index.html')))
+        .catch(() => caches.match(key, { ignoreSearch: true }).then((hit) => hit || caches.match('index.html')))
     );
     return;
   }

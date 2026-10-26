@@ -174,6 +174,8 @@ export async function build({ report = false } = {}) {
   await writeFile(join(OUT_DIR, 'feed.json.tmp'), json);
   await rename(join(OUT_DIR, 'feed.json.tmp'), join(OUT_DIR, 'feed.json'));
   await writeFile(join(OUT_DIR, 'meta.json'), JSON.stringify({ updatedAt: now, count: articles.length, newest: articles[0]?.id || null }));
+  // versão do código publicado: o app recarrega sozinho quando ela muda
+  await writeFile(join(ROOT, 'public', 'version.json'), JSON.stringify({ app: process.env.GITHUB_SHA || 'dev', builtAt: now }));
 
   // 6. Relatório
   const secs = ((Date.now() - started) / 1000).toFixed(1);

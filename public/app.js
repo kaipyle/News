@@ -954,9 +954,18 @@ function ingest(data) {
   data.articles = data.articles.filter((a) => state.src[a.s]);
 }
 
+// O site (GitHub Pages) guarda cópias por até 10 min; o parâmetro "t" pede sempre a mais nova.
+const fresh = (path) => fetch(`${path}?t=${Date.now()}`, { cache: 'no-store' });
+
+// Versão do app publicada junto com as notícias: quando muda, puxar para atualizar recarrega o app.
+async function readVersion() {
+  try { return (await (await fresh('version.json')).json()).app || null; } catch { return null; }
+}
+
 async function load() {
+  readVersion().then((v) => { state.appVersion = v; });
   try {
-    const res = await fetch('data/feed.json', { cache: 'no-cache' });
+    const res = await fresh('data/feed.json');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     ingest(await res.json());
     state.lastCheck = Date.now();
@@ -973,9 +982,9 @@ async function checkFresh() {
   if (!state.data || document.hidden) return;
   state.lastCheck = Date.now();
   try {
-    const meta = await (await fetch('data/meta.json', { cache: 'no-cache' })).json();
+    const meta = await (await fresh('data/meta.json')).json();
     if (meta.updatedAt <= (state.pending?.updatedAt || state.data.updatedAt)) return;
-    const data = await (await fetch('data/feed.json', { cache: 'no-cache' })).json();
+    const data = await (await fresh('data/feed.json')).json();
     const known = new Set(state.data.articles.map((a) => a.id));
     const fresh = data.articles.filter((a) => !known.has(a.id) && inView(a, state.route.view)).length;
     const sheetOpen = !$('#sheet').hidden;
@@ -1000,6 +1009,104 @@ function applyPending() {
   render();
   window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
+
+// ───────────────────────── Puxar para atualizar ─────────────────────────
+
+async function refreshNow() {
+  try {
+    const v = await readVersion();
+    if (v && state.appVersion && v !== state.appVersion) {
+      location.reload(); // versão nova do app: recarrega para pegar o código novo
+      return null;
+    }
+    const meta = await (await fresh('data/meta.json')).json();
+    if (meta.updatedAt <= state.data.updatedAt) {
+      if (state.pending) { applyPending(); return null; }
+      return `Nada novo desde ${fmtTime.format(state.data.updatedAt)}. As fontes são lidas a cada 15 minutos.`;
+    }
+    const data = await (await fresh('data/feed.json')).json();
+    const known = new Set(state.data.articles.map((a) => a.id));
+    const n = data.articles.filter((a) => !known.has(a.id)).length;
+    state.pending = null;
+    $('.fresh').hidden = true;
+    ingest(data);
+    state.lastCheck = Date.now();
+    state.limit = 30;
+    render();
+    return n ? `${plural(n, 'matéria nova', 'matérias novas')}` : 'Notícias atualizadas';
+  } catch {
+    return navigator.onLine ? 'Não foi possível atualizar agora. Tente de novo.' : 'Sem conexão. Mostrando a última atualização salva.';
+  }
+}
+
+const PTR_TRIGGER = 72, PTR_MAX = 120;
+const ptrEl = $('.ptr');
+let pull = null;
+
+function paintPull(d) {
+  const main = $('#main');
+  ptrEl.style.transition = main.style.transition = 'none';
+  ptrEl.classList.toggle('is-ready', d >= PTR_TRIGGER);
+  ptrEl.style.opacity = String(Math.min(1, d / 36));
+  ptrEl.style.transform = `translateY(${d}px)`;
+  ptrEl.style.setProperty('--turn', `${d * 3}deg`);
+  main.style.transform = `translateY(${d * 0.45}px)`;
+}
+
+function resetPull() {
+  const main = $('#main');
+  ptrEl.style.transition = main.style.transition = 'transform .28s cubic-bezier(.2,.8,.2,1), opacity .2s';
+  ptrEl.style.transform = 'translateY(0)';
+  ptrEl.style.opacity = '0';
+  main.style.transform = '';
+  ptrEl.classList.remove('is-ready', 'is-loading');
+}
+
+async function runPull() {
+  state.refreshing = true;
+  const main = $('#main');
+  ptrEl.classList.add('is-loading');
+  ptrEl.style.transition = main.style.transition = 'transform .2s ease';
+  ptrEl.style.transform = `translateY(${PTR_TRIGGER * 0.8}px)`;
+  main.style.transform = `translateY(${PTR_TRIGGER * 0.36}px)`;
+  const t0 = Date.now();
+  const msg = await refreshNow();
+  await new Promise((r) => setTimeout(r, Math.max(0, 600 - (Date.now() - t0)))); // o giro precisa ser visto
+  state.refreshing = false;
+  resetPull();
+  if (msg) toast(msg);
+}
+
+document.addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 1 || window.scrollY > 0 || state.refreshing || !state.data) return;
+  if (document.body.style.overflow === 'hidden') return; // menu ou janela aberta
+  pull = { x0: e.touches[0].clientX, y0: e.touches[0].clientY, d: 0, active: false, decided: false };
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+  if (!pull) return;
+  const dx = e.touches[0].clientX - pull.x0, dy = e.touches[0].clientY - pull.y0;
+  if (!pull.decided) {
+    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    pull.decided = true;
+    // só puxada para baixo, no topo; arrastar temas para o lado não conta
+    if (dy <= 0 || Math.abs(dx) > Math.abs(dy) || window.scrollY > 0) { pull = null; return; }
+    pull.active = true;
+  }
+  e.preventDefault();
+  pull.d = Math.min(PTR_MAX, Math.max(0, dy) * 0.5);
+  paintPull(pull.d);
+}, { passive: false });
+
+document.addEventListener('touchend', () => {
+  if (!pull) return;
+  const trigger = pull.active && pull.d >= PTR_TRIGGER;
+  const moved = pull.active;
+  pull = null;
+  if (trigger) runPull();
+  else if (moved) resetPull();
+});
+document.addEventListener('touchcancel', () => { if (pull?.active) resetPull(); pull = null; });
 
 setInterval(checkFresh, 4 * 60e3);
 document.addEventListener('visibilitychange', () => {

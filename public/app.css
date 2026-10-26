@@ -86,7 +86,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overscroll-behavior-y: none; }
 body {
   margin: 0;
   background: var(--paper);
@@ -239,6 +239,18 @@ svg { display: block; }
 
 /* ───────── Conteúdo ───────── */
 main { max-width: var(--col); margin: 0 auto; padding: 0 var(--gutter) 40px; outline: none; }
+
+/* Puxar para atualizar: o círculo desce por baixo do topo e gira conforme o dedo */
+.ptr {
+  position: fixed; z-index: 15; left: 50%; top: calc(var(--head-h, 52px) - 46px);
+  width: 42px; height: 42px; margin-left: -21px; border-radius: 50%;
+  display: grid; place-items: center; opacity: 0; pointer-events: none;
+  background: var(--menu-surface); color: var(--ink-3); box-shadow: 0 4px 16px rgb(0 0 0 / .18);
+}
+.ptr svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transform: rotate(var(--turn, 0deg)); }
+.ptr.is-ready, .ptr.is-loading { color: var(--ink); }
+.ptr.is-loading svg { animation: ptr-spin .75s linear infinite; }
+@keyframes ptr-spin { to { transform: rotate(360deg); } }
 
 .fresh {
   position: fixed; z-index: 25; left: 50%; transform: translateX(-50%);
