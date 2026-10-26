@@ -61,6 +61,7 @@ const state = {
   route: null,
   limit: 30,
   read: new Set(store.get('read', [])),
+  translate: store.get('translate', false), // matérias em inglês exibidas em português
   pending: null, // feed novo aguardando o leitor tocar em "novas matérias"
   lastCheck: 0,
   lastFocus: null,
@@ -117,7 +118,25 @@ const biasOf = (a) => a.b ?? state.src[a.s].bias;
 const has = (a, t) => a.tp?.includes(t);
 const FOREIGN = ['eua', 'america-latina', 'europa', 'russia-ucrania', 'oriente-medio', 'china', 'africa'];
 const isForeign = (a) => a.rg?.some((r) => FOREIGN.includes(r));
-const hay = (a) => (a._hay ||= fold(`${a.t} ${a.x || ''} ${(a.by || []).join(' ')} ${state.src[a.s].name}`));
+const hay = (a) => (a._hay ||= fold(`${a.t} ${a.x || ''} ${a.tt || ''} ${a.tx || ''} ${(a.by || []).join(' ')} ${state.src[a.s].name}`));
+
+// Tradução: títulos e resumos vêm traduzidos da coleta; a matéria abre pelo Google Tradutor.
+const translated = (a) => state.translate && !!a.tt;
+const titleOf = (a) => (translated(a) ? a.tt : a.t);
+const excerptOf = (a) => (translated(a) ? a.tx || a.x : a.x);
+function linkOf(a) {
+  if (!translated(a) || state.src[a.s].googleNews) return a.u;
+  try {
+    const u = new URL(a.u);
+    const host = u.hostname.replace(/-/g, '--').replace(/\./g, '-');
+    const qs = new URLSearchParams(u.search);
+    qs.set('_x_tr_sl', 'en'); qs.set('_x_tr_tl', 'pt'); qs.set('_x_tr_hl', 'pt-BR'); qs.set('_x_tr_pto', 'wapp');
+    return `https://${host}.translate.goog${u.pathname}?${qs}`;
+  } catch {
+    return a.u;
+  }
+}
+const storyTitle = (st) => { const ref = state.byId.get(st.id); return ref ? titleOf(ref) : st.title; };
 
 function matchTema(a, t) {
   if (t === 'ultima-hora') return Date.now() - a.d < 3 * HOUR;
@@ -235,14 +254,15 @@ function card(a) {
   const bias = biasOf(a);
   const flags = a.live ? [`<span class="now is-live">Ao vivo</span>`] : [];
   const tags = [];
+  if (translated(a)) tags.push(`<span class="tag-soft" title="Original: ${esc(a.t)}">Traduzido do inglês</span>`);
   if (a.op) tags.push(`<span class="tag">Opinião</span>`);
   else if (a.an) tags.push(`<span class="tag">Análise</span>`);
   if (s.paywall) tags.push(`<span class="pay" title="Exige assinatura" aria-label="Exige assinatura">${icon('lock')}</span>`);
   const read = state.read.has(a.id) ? ' is-read' : '';
   return `<article class="card${read}" data-id="${a.id}">
     <div class="card-main">
-      <h3 class="hl"><a href="${esc(a.u)}" target="_blank" rel="noopener" data-read="${a.id}">${esc(a.t)}</a></h3>
-      ${a.x ? `<p class="excerpt">${esc(a.x)}</p>` : ''}
+      <h3 class="hl"${translated(a) ? ` lang="pt-BR" title="${esc(a.t)}"` : ''}><a href="${esc(linkOf(a))}" target="_blank" rel="noopener" data-read="${a.id}">${esc(titleOf(a))}</a></h3>
+      ${excerptOf(a) ? `<p class="excerpt">${esc(excerptOf(a))}</p>` : ''}
     </div>
     <div class="lean">${ruler(bias)}<button class="src-btn" data-fonte="${s.id}">${esc(s.name)}</button><span class="lean-label">${bucketLabel(bias)}${a.b != null ? ' (opinião)' : ''}</span></div>
     <div class="meta">${metaLine([...flags, authorsHtml(a, s), `<time datetime="${new Date(a.d).toISOString()}" title="${esc(fmtFull.format(a.d))}">${when(a.d)}</time>`, ...tags])}</div>
@@ -260,7 +280,7 @@ const spreadAria = (l) => `${l.e} à esquerda, ${l.c} de centro, ${l.d} à direi
 
 function storyCard(st) {
   return `<button class="story" data-story="${st.id}">
-    <span class="story-title">${esc(st.title)}</span>
+    <span class="story-title">${esc(storyTitle(st))}</span>
     <span class="story-foot"><span>${plural(st.ids.length, 'veículo', 'veículos')}</span>
       <span class="spread-legend" aria-label="${spreadAria(st.lanes)}">${spread(st.lanes)}<span aria-hidden="true">${spreadText(st.lanes)}</span></span></span>
   </button>`;
@@ -409,12 +429,12 @@ function compareCard(st) {
   const block = (k) => {
     const items = byLane[k].slice(0, 2);
     const body = items.length
-      ? items.map((a) => `<a class="mini" href="${esc(a.u)}" target="_blank" rel="noopener" data-read="${a.id}"><span class="mini-title">${esc(a.t)}</span><span class="mini-src">${esc(state.src[a.s].name)} <span>· ${fmtTime.format(a.d)}</span></span></a>`).join('')
+      ? items.map((a) => `<a class="mini" href="${esc(linkOf(a))}" target="_blank" rel="noopener" data-read="${a.id}"><span class="mini-title">${esc(titleOf(a))}</span><span class="mini-src">${esc(state.src[a.s].name)} <span>· ${fmtTime.format(a.d)}</span></span></a>`).join('')
       : `<p class="lane-empty">Nenhum veículo ${k === 'e' ? 'à esquerda' : k === 'd' ? 'à direita' : 'de centro'} noticiou ainda.</p>`;
     return `<div class="lane-block"><p class="lane-name">${LANES[k]}${byLane[k].length > 2 ? ` <span>+${byLane[k].length - 2}</span>` : ''}</p>${body}</div>`;
   };
   return `<article class="compare">
-    <div class="compare-head"><h3>${esc(st.title)}</h3>
+    <div class="compare-head"><h3>${esc(storyTitle(st))}</h3>
       <div class="story-foot"><span class="spread-legend" aria-label="${spreadAria(st.lanes)}">${spread(st.lanes)}</span><span>${plural(members.length, 'veículo', 'veículos')} · ${spreadText(st.lanes)}</span></div></div>
     <div class="compare-lanes">${block('e')}${block('c')}${block('d')}</div>
     <button class="compare-more" data-story="${st.id}">Ver as ${members.length} versões lado a lado</button>
@@ -659,7 +679,8 @@ function openStory(id) {
     <p class="balance" style="margin:0 0 4px">${spread(st.lanes)} ${spreadText(st.lanes)}</p>
     ${['e', 'c', 'd'].map((k) => `<h3 class="lane-tag" style="margin:18px 0 0">${LANES[k]} · ${byLane[k].length}</h3>
       ${byLane[k].length ? `<div class="story-list">${byLane[k].map(card).join('')}</div>` : `<p class="lane-empty" style="margin:8px 0 0">Nenhum veículo deste campo noticiou até agora. Ausência também é escolha editorial.</p>`}`).join('')}`;
-  openSheet(st.title.length > 60 ? 'Mesma pauta' : st.title, body);
+  const title = storyTitle(st);
+  openSheet(title.length > 60 ? 'Mesma pauta' : title, body);
   $('#sheet').dataset.kind = 'story';
 }
 
@@ -679,6 +700,8 @@ function openHelp() {
     <p>Reuters e AP não têm feed público: os títulos chegam pelo Google Notícias, sem autor. The Economist não assina textos por política própria.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Atualização</h3>
     <p>As fontes são lidas a cada 15 minutos. Última coleta: ${esc(updated)}. Quando chegam matérias novas, um aviso aparece no topo.</p>
+    <h3 class="lane-tag" style="margin:20px 0 8px">Tradução</h3>
+    <p>O botão <strong>文A</strong> no topo mostra as matérias em inglês em português: título e resumo traduzidos automaticamente (marcados com "Traduzido do inglês") e a matéria abre pelo Google Tradutor. Toque de novo para voltar ao original. Sites com paywall podem não abrir traduzidos; no iPhone, o Safari também traduz pelo botão <strong>aA</strong> da barra de endereço.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Colocar na tela do celular</h3>
     <p><strong>iPhone (Safari):</strong> botão Compartilhar → Adicionar à Tela de Início.<br><strong>Android (Chrome):</strong> menu ⋮ → Instalar app ou Adicionar à tela inicial.</p>
   </div>`;
@@ -719,6 +742,12 @@ document.addEventListener('click', (ev) => {
   switch (t.dataset.action) {
     case 'filters': return openFilters();
     case 'help': return openHelp();
+    case 'translate':
+      state.translate = !state.translate;
+      store.set('translate', state.translate);
+      syncTranslateButton();
+      toast(state.translate ? 'Matérias em inglês agora aparecem em português' : 'Mostrando os textos no idioma original');
+      return render();
     case 'close-sheet': return closeSheet();
     case 'clear-filters':
       go({ tema: [], lado: [], pais: [], idioma: '', tipo: '', pay: '', q: '' }, { replace: true });
@@ -776,6 +805,22 @@ window.addEventListener('online', render);
 window.addEventListener('offline', render);
 let lastWide = matchMedia('(min-width: 960px)').matches;
 matchMedia('(min-width: 960px)').addEventListener('change', (e) => { if (e.matches !== lastWide) { lastWide = e.matches; render(); } });
+
+function syncTranslateButton() {
+  const b = $('[data-action="translate"]');
+  b.setAttribute('aria-pressed', String(state.translate));
+  b.setAttribute('aria-label', state.translate ? 'Tradução ligada: mostrar textos originais' : 'Traduzir matérias em inglês para o português');
+  b.title = state.translate ? 'Tradução ligada' : 'Traduzir para o português';
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = $('.toast');
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
+}
 
 function measureHead() {
   const h = $('.top').getBoundingClientRect().height;
@@ -849,5 +894,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 }
 
 state.route = parseRoute();
+syncTranslateButton();
 renderChrome();
 load();

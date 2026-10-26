@@ -116,6 +116,7 @@ svg { display: block; }
 }
 .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .icon-btn:active { background: var(--tint); }
+.icon-btn[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
 .badge {
   position: absolute; top: 5px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px;
   border-radius: 8px; background: var(--ink); color: var(--paper);
@@ -180,6 +181,14 @@ main { max-width: var(--col); margin: 0 auto; padding: 0 var(--gutter) 40px; out
 }
 .fresh::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--tally); }
 
+.toast {
+  position: fixed; z-index: 45; left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--tab-h) + var(--safe-b) + 14px); max-width: calc(100% - 32px);
+  background: var(--ink); color: var(--paper); border-radius: 10px; padding: 10px 14px;
+  font: 550 13.5px/1.35 var(--sans); box-shadow: 0 8px 24px rgb(0 0 0 / .2); animation: rise .2s ease-out;
+}
+@media (min-width: 960px) { .toast { bottom: 24px; } }
+
 .notice {
   display: flex; gap: 10px; align-items: flex-start; margin: 14px 0 4px; padding: 12px 12px 12px 14px;
   border: 1px solid var(--rule); border-radius: var(--radius); background: var(--raised);
@@ -238,6 +247,7 @@ main { max-width: var(--col); margin: 0 auto; padding: 0 var(--gutter) 40px; out
 .by-btn:hover { text-decoration: underline; text-underline-offset: 2px; }
 .by-none { font-style: normal; }
 .tag { color: var(--ink-2); font-weight: 600; }
+.tag-soft { color: var(--ink-3); font-style: italic; }
 .now { color: var(--tally); font-weight: 650; white-space: nowrap; }
 .now::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: currentColor; vertical-align: 1px; }
 .now.is-live::before { animation: tally 1.6s ease-in-out infinite; }

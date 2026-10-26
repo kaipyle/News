@@ -141,3 +141,45 @@ test('URL canônica remove rastreadores', () => {
   assert.equal(canonicalUrl('http://www.bbc.co.uk/news/x?at_medium=RSS&amp;at_campaign=rss'), 'https://www.bbc.co.uk/news/x');
   assert.equal(canonicalUrl('https://www.ft.com/content/abc?syn-25a6b1a6=1'), 'https://www.ft.com/content/abc');
 });
+
+test('tradução: lote, reserva um-a-um e só matérias em inglês', async () => {
+  const { translateArticles } = await import('../lib/translate.mjs');
+  const sourcesById = Object.fromEntries(SOURCES.map((s) => [s.id, s]));
+  const arts = [
+    { id: '1', s: 'bbc', t: 'Lula wins', x: 'Big comeback' },
+    { id: '2', s: 'reuters', t: 'Oil rises', x: '' },
+    { id: '3', s: 'folha', t: 'Lula vence', x: 'Virada' },
+    { id: '4', s: 'nyt', t: 'Already', tt: 'Já', x: '' },
+  ];
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, opts) => {
+    calls.push(String(url));
+    if (String(url).includes('/translate_a/t?')) {
+      const qs = new URLSearchParams(opts.body).getAll('q');
+      return new Response(JSON.stringify(qs.map((q) => `PT(${q}) &amp; ok`)), { status: 200 });
+    }
+    throw new Error('não deveria chamar');
+  };
+  try {
+    await translateArticles(arts, sourcesById, {});
+  } finally { globalThis.fetch = realFetch; }
+  assert.equal(arts[0].tt, 'PT(Lula wins) & ok');
+  assert.equal(arts[0].tx, 'PT(Big comeback) & ok');
+  assert.equal(arts[1].tt, 'PT(Oil rises) & ok');
+  assert.equal(arts[1].tx, undefined);
+  assert.equal(arts[2].tt, undefined, 'matéria em português não é traduzida');
+  assert.equal(arts[3].tt, 'Já', 'tradução anterior é mantida');
+  assert.equal(calls.length, 1, 'tudo numa requisição');
+
+  // endpoint em lote fora do ar: cai para um texto por vez
+  const b = [{ id: '5', s: 'guardian', t: 'War ends', x: '' }];
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('/translate_a/t?')) return new Response('erro', { status: 429 });
+    return new Response(JSON.stringify([[['A guerra ', 'War '], ['termina', 'ends']]]), { status: 200 });
+  };
+  try {
+    await translateArticles(b, sourcesById, {});
+  } finally { globalThis.fetch = realFetch; }
+  assert.equal(b[0].tt, 'A guerra termina');
+});

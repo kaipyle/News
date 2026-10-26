@@ -14,6 +14,7 @@ import { TOPICS, REGIONS } from '../config/topics.mjs';
 import { parseFeed } from '../lib/parse.mjs';
 import { toArticle } from '../lib/normalize.mjs';
 import { enrichArticles } from '../lib/enrich.mjs';
+import { translateArticles } from '../lib/translate.mjs';
 import { clusterStories } from '../lib/cluster.mjs';
 import { fetchText, fetchPage } from '../lib/http.mjs';
 
@@ -101,6 +102,8 @@ export async function build({ report = false } = {}) {
         if (!a.by.length && old.by?.length) a.by = old.by;
         if (!a.img && old.img) a.img = old.img;
         if (old.enr) a.enr = 1;
+        // tradução só vale enquanto o texto original for o mesmo
+        if (old.tt && old.t === a.t) { a.tt = old.tt; if (old.tx && old.x === a.x) a.tx = old.tx; }
       }
       byId.set(a.id, a);
     }
@@ -130,6 +133,9 @@ export async function build({ report = false } = {}) {
   if (process.env.SKIP_ENRICH !== '1') {
     await enrichArticles(articles, sourcesById, { fetchPage, budget: Number(process.env.ENRICH_BUDGET || 160), log });
   }
+  if (process.env.SKIP_TRANSLATE !== '1') {
+    await translateArticles(articles, sourcesById, { budget: Number(process.env.TRANSLATE_BUDGET || 600), log });
+  }
 
   // 4. Mesma pauta, ângulos diferentes
   const lane = laneOf(sourcesById);
@@ -150,7 +156,7 @@ export async function build({ report = false } = {}) {
   for (const a of articles) {
     delete a._section;
     for (const k of ['by', 'tp', 'rg']) if (!a[k]?.length) delete a[k];
-    for (const k of ['x', 'img']) if (!a[k]) delete a[k];
+    for (const k of ['x', 'img', 'tt', 'tx']) if (!a[k]) delete a[k];
   }
   const feed = {
     v: 1,
@@ -191,6 +197,9 @@ export async function build({ report = false } = {}) {
       log(`  [${st.lang}${st.br ? ' BR' : ''}] ${st.ids.length} veículos E${st.lanes.e} C${st.lanes.c} D${st.lanes.d} — ${st.title}`);
       for (const id of st.ids) { const a = byId.get(id); log(`        · ${a.s}: ${a.t.slice(0, 110)}`); }
     }
+    const en = articles.filter((a) => sourcesById[a.s].lang === 'en');
+    log(`\ntraduzidas: ${en.filter((a) => a.tt).length} de ${en.length} matérias em inglês`);
+    for (const a of en.filter((a) => a.tt).slice(0, 6)) log(`  ${a.s}: ${a.t}\n     → ${a.tt}${a.tx ? `\n     → ${a.tx.slice(0, 140)}` : ''}`);
     log('\namostra de autores por fonte:');
     for (const s of SOURCES) {
       const ex = articles.filter((a) => a.s === s.id && a.by?.length).slice(0, 3).map((a) => a.by.join(' + '));
