@@ -29,6 +29,9 @@ async function refresh() {
     const feed = JSON.parse(await readFile(join(PUBLIC, 'data/feed.json'), 'utf8'));
     const { writeFile } = await import('node:fs/promises');
     await writeFile(join(PUBLIC, 'data/meta.json'), JSON.stringify({ updatedAt: feed.updatedAt, count: feed.articles.length }));
+    // a coleta de exemplo não guarda resumos: usa a chamada de cada matéria no lugar
+    const { writeSummaries } = await import('./lib/summary.mjs');
+    await writeSummaries(join(PUBLIC, 'data'), Object.fromEntries(feed.articles.filter((a) => a.x).map((a) => [a.id, a.tx ? [a.x, a.tx] : [a.x]])));
     console.log('modo demonstração: usando test/fixtures/feed.json');
     return;
   }

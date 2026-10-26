@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { parseFeed, parseDate, decodeBody } from '../lib/parse.mjs';
 import { toArticle, canonicalUrl, cleanAuthors, classify } from '../lib/normalize.mjs';
 import { extractMeta } from '../lib/enrich.mjs';
+import { clipSummary, composeSummary, ledeFromHtml, shardOf, SHARDS } from '../lib/summary.mjs';
 import { clusterStories } from '../lib/cluster.mjs';
 import { SOURCES } from '../config/sources.mjs';
 
@@ -150,6 +151,7 @@ test('tradução: lote, reserva um-a-um e só matérias em inglês', async () =>
     { id: '2', s: 'reuters', t: 'Oil rises', x: '' },
     { id: '3', s: 'folha', t: 'Lula vence', x: 'Virada' },
     { id: '4', s: 'nyt', t: 'Already', tt: 'Já', x: '' },
+    { id: '6', s: 'ft', t: 'Rates', tt: 'Juros', x: '', rs: 'The Fed held rates. Markets rallied.' },
   ];
   const realFetch = globalThis.fetch;
   const calls = [];
@@ -170,6 +172,8 @@ test('tradução: lote, reserva um-a-um e só matérias em inglês', async () =>
   assert.equal(arts[1].tx, undefined);
   assert.equal(arts[2].tt, undefined, 'matéria em português não é traduzida');
   assert.equal(arts[3].tt, 'Já', 'tradução anterior é mantida');
+  assert.equal(arts[4].trs, 'PT(The Fed held rates. Markets rallied.) & ok', 'resumo novo é traduzido mesmo com título já traduzido');
+  assert.equal(arts[4].tt, 'Juros');
   assert.equal(calls.length, 1, 'tudo numa requisição');
 
   // endpoint em lote fora do ar: cai para um texto por vez
@@ -182,4 +186,65 @@ test('tradução: lote, reserva um-a-um e só matérias em inglês', async () =>
     await translateArticles(b, sourcesById, {});
   } finally { globalThis.fetch = realFetch; }
   assert.equal(b[0].tt, 'A guerra termina');
+});
+
+test('resumo: corta em fim de frase, junta linha fina e lide sem repetir', () => {
+  const long = 'O Copom manteve a Selic em 13,75% ao ano. A decisão foi unânime e veio em linha com o esperado. ' +
+    'O comunicado sinaliza cautela com o cenário externo e com a inflação de serviços, que segue acima da meta há meses. ' +
+    'Economistas ouvidos pela reportagem esperam cortes a partir de março, se o câmbio der trégua e as expectativas cederem.';
+  const c = clipSummary(long, 200);
+  assert.ok(c.length <= 200 && /\.$/.test(c), 'termina em ponto final');
+  assert.ok(c.startsWith('O Copom manteve'));
+  assert.equal(clipSummary('curto.', 200), 'curto.');
+  assert.match(clipSummary('palavra '.repeat(80), 100), /…$/, 'sem frase completa, reticências');
+
+  // a linha fina já está no começo do texto: não repete
+  const s1 = composeSummary({ description: 'O Copom manteve a Selic em 13,75% ao ano', lede: long, title: 'Copom mantém juros' });
+  assert.equal((s1.match(/O Copom manteve/g) || []).length, 1);
+  // linha fina diferente do texto: vem primeiro, com ponto
+  const s2 = composeSummary({ description: 'Decisão foi unânime', lede: 'Os diretores citaram o câmbio.', title: 'Copom' });
+  assert.equal(s2, 'Decisão foi unânime. Os diretores citaram o câmbio.');
+  // descrição igual ao título é descartada
+  assert.equal(composeSummary({ description: 'Copom mantém juros', lede: '', title: 'Copom mantém juros' }), '');
+});
+
+test('resumo: primeiros parágrafos ignoram legenda, chamada e aviso', () => {
+  const html = `<html><body><nav><p>Menu do site com muitos links e coisas que não são matéria nenhuma, mesmo longas</p></nav>
+    <article><p>Foto: Reuters/Fulano de Tal — Presidente durante evento oficial em Brasília nesta segunda</p>
+    <p>Por Ana Souza</p>
+    <p>O governo anunciou nesta segunda-feira um pacote de medidas para conter a alta dos alimentos, com corte de tarifas.</p>
+    <p>Leia também: outra matéria qualquer sobre um assunto parecido que não interessa ao resumo</p>
+    <p>Segundo o ministério, o impacto fiscal será de R$ 2 bilhões em 2027, compensado por receitas extras.</p></article></body></html>`;
+  const lede = ledeFromHtml(html);
+  assert.ok(lede.startsWith('O governo anunciou'), lede);
+  assert.ok(lede.includes('impacto fiscal'));
+  assert.ok(!/Foto|Leia também|Menu/.test(lede));
+});
+
+test('resumo: vem do texto completo do feed e da página da matéria', () => {
+  const xml = `<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>InfoMoney</title>
+    <item><title>Ibovespa sobe com exterior</title><link>https://www.infomoney.com.br/mercados/ibovespa-sobe/</link>
+    <pubDate>Mon, 26 Oct 2026 14:00:00 +0000</pubDate><description>O Ibovespa sobe nesta segunda.</description>
+    <content:encoded><![CDATA[<p>O Ibovespa sobe nesta segunda-feira, acompanhando o bom humor das bolsas americanas depois de dados de inflação mais fracos que o esperado.</p>
+    <p>O dólar recua 0,8% e os juros futuros caem em toda a curva, com investidores apostando em cortes da Selic já em dezembro.</p>]]></content:encoded></item>
+    </channel></rss>`;
+  const im = src('infomoney');
+  const a = toArticle(parseFeed(xml).items[0], im.feeds[0], im, NOW);
+  assert.ok(a.rs && a.rs.startsWith('O Ibovespa sobe nesta segunda-feira'), a.rs);
+  assert.ok(a.rs.includes('juros futuros'));
+  assert.equal((a.rs.match(/O Ibovespa sobe/g) || []).length, 1, 'a chamada não se repete');
+
+  const page = `<html><head><meta property="og:description" content="Medida vale a partir de janeiro">
+    <script type="application/ld+json">{"@type":"NewsArticle","headline":"Governo corta tarifa","articleBody":"O governo zerou a tarifa de importação de 12 alimentos para conter a inflação. A medida vale por um ano e pode ser renovada. O custo estimado é de R$ 2 bilhões, segundo a Fazenda, que promete compensar com outras receitas ao longo de 2027."}</script>
+    </head><body></body></html>`;
+  const m = extractMeta(page);
+  assert.equal(m.description, 'Medida vale a partir de janeiro');
+  assert.ok(m.lede.startsWith('O governo zerou'));
+  const rs = composeSummary({ description: m.description, lede: m.lede, title: 'Governo corta tarifa' });
+  assert.ok(rs.startsWith('Medida vale a partir de janeiro. O governo zerou'), rs);
+});
+
+test('resumo: arquivo de cada matéria é estável, numerado (sem problema de maiúsculas) e cabe nos 32', () => {
+  assert.equal(shardOf('Ab3_x'), 'A'.charCodeAt(0) % SHARDS);
+  for (const id of ['-abc', '_abc', 'zzz', '0aa', 'Zaa']) assert.ok(shardOf(id) >= 0 && shardOf(id) < SHARDS);
 });

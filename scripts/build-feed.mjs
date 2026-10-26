@@ -4,7 +4,7 @@
 //   node scripts/build-feed.mjs            coleta e grava
 //   node scripts/build-feed.mjs --report   idem, com relatório detalhado por fonte
 //
-// Estado anterior: reaproveita public/data/feed.json local ou, se não existir,
+// Estado anterior: reaproveita public/data/feed.json (e resumos.json) local ou, se não existir,
 // PREVIOUS_FEED_URL (no GitHub Actions, o feed já publicado no site).
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -16,6 +16,7 @@ import { toArticle } from '../lib/normalize.mjs';
 import { enrichArticles } from '../lib/enrich.mjs';
 import { translateArticles } from '../lib/translate.mjs';
 import { clusterStories } from '../lib/cluster.mjs';
+import { writeSummaries } from '../lib/summary.mjs';
 import { fetchText, fetchPage } from '../lib/http.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,11 +26,11 @@ const MAX_PER_SOURCE = 300;
 
 const log = (...a) => console.log(...a);
 
-async function loadPrevious() {
+async function loadPrevious(name = 'feed.json') {
   try {
-    return JSON.parse(await readFile(join(OUT_DIR, 'feed.json'), 'utf8'));
+    return JSON.parse(await readFile(join(OUT_DIR, name), 'utf8'));
   } catch {}
-  const url = process.env.PREVIOUS_FEED_URL;
+  const url = process.env.PREVIOUS_FEED_URL?.replace(/feed\.json$/, name);
   if (!url) return null;
   try {
     const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
@@ -60,7 +61,11 @@ export async function build({ report = false } = {}) {
   const now = started;
   const sourcesById = Object.fromEntries(SOURCES.map((s) => [s.id, s]));
   const prev = await loadPrevious();
-  const prevById = new Map((prev?.articles || []).map((a) => [a.id, { by: [], tp: [], rg: [], x: '', img: '', ...a }]));
+  const prevSummaries = (await loadPrevious('resumos.json')) || {};
+  const prevById = new Map((prev?.articles || []).map((a) => {
+    const [rs, trs] = prevSummaries[a.id] || [];
+    return [a.id, { by: [], tp: [], rg: [], x: '', img: '', ...a, ...(rs && { rs }), ...(trs && { trs }) }];
+  }));
   log(`estado anterior: ${prevById.size} matérias`);
 
   // 1. Coleta
@@ -101,9 +106,12 @@ export async function build({ report = false } = {}) {
       if (old) {
         if (!a.by.length && old.by?.length) a.by = old.by;
         if (!a.img && old.img) a.img = old.img;
-        if (old.enr) a.enr = 1;
+        if (old.enr) a.enr = old.enr;
         // tradução só vale enquanto o texto original for o mesmo
         if (old.tt && old.t === a.t) { a.tt = old.tt; if (old.tx && old.x === a.x) a.tx = old.tx; }
+        // resumo: fica o mais completo (o da página costuma ganhar do feed)
+        if (old.rs && old.rs.length > (a.rs?.length || 0)) a.rs = old.rs;
+        if (old.trs && old.rs === a.rs) a.trs = old.trs;
       }
       byId.set(a.id, a);
     }
@@ -152,6 +160,13 @@ export async function build({ report = false } = {}) {
   stories.sort((x, y) => y.ids.length - x.ids.length || y.d - x.d);
 
   // 5. Grava
+  // resumos vão para arquivos à parte: o app só baixa quando o leitor abre um
+  const summaries = {};
+  for (const a of articles) {
+    if (a.rs) summaries[a.id] = a.trs ? [a.rs, a.trs] : [a.rs];
+    delete a.rs;
+    delete a.trs;
+  }
   // campos vazios não vão para o JSON (o app trata ausência como vazio)
   for (const a of articles) {
     delete a._section;
@@ -161,7 +176,7 @@ export async function build({ report = false } = {}) {
   const feed = {
     v: 1,
     updatedAt: now,
-    sources: SOURCES.map(({ feeds, ...s }) => ({ ...s, feeds: feeds.length })),
+    sources: SOURCES.map(({ feeds, titleStrip, ...s }) => ({ ...s, feeds: feeds.length })),
     countries: COUNTRIES,
     topics: TOPICS.map(({ id, label, short }) => ({ id, label, short })),
     regions: REGIONS.map(({ id, label }) => ({ id, label })),
@@ -173,20 +188,20 @@ export async function build({ report = false } = {}) {
   const json = JSON.stringify(feed);
   await writeFile(join(OUT_DIR, 'feed.json.tmp'), json);
   await rename(join(OUT_DIR, 'feed.json.tmp'), join(OUT_DIR, 'feed.json'));
+  await writeSummaries(OUT_DIR, summaries);
   await writeFile(join(OUT_DIR, 'meta.json'), JSON.stringify({ updatedAt: now, count: articles.length, newest: articles[0]?.id || null }));
 
   // 6. Relatório
   const secs = ((Date.now() - started) / 1000).toFixed(1);
-  log(`\n${articles.length} matérias, ${stories.length} pautas em comum, ${(json.length / 1024).toFixed(0)} kB, ${secs}s`);
+  log(`\n${articles.length} matérias, ${stories.length} pautas em comum, ${(json.length / 1024).toFixed(0)} kB, ${Object.keys(summaries).length} resumos, ${secs}s`);
   const failed = Object.entries(health).filter(([, h]) => h.errors.length);
   for (const [id, h] of failed) for (const e of h.errors) log(`  ✗ ${id}: ${e}`);
   if (report) {
-    log('\nfonte            matérias  c/autor  c/imagem  feeds');
+    log('\nfonte            matérias  c/autor  c/imagem  c/resumo  feeds');
+    const pct = (list, f) => (list.length ? Math.round((100 * list.filter(f).length) / list.length) : 0) + '%';
     for (const s of SOURCES) {
       const list = articles.filter((a) => a.s === s.id);
-      const pa = list.length ? Math.round((100 * list.filter((a) => a.by?.length).length) / list.length) : 0;
-      const pi = list.length ? Math.round((100 * list.filter((a) => a.img).length) / list.length) : 0;
-      log(`${s.id.padEnd(16)} ${String(list.length).padStart(8)} ${String(pa + '%').padStart(8)} ${String(pi + '%').padStart(9)}  ${health[s.id].ok}/${health[s.id].feeds}`);
+      log(`${s.id.padEnd(16)} ${String(list.length).padStart(8)} ${pct(list, (a) => a.by?.length).padStart(8)} ${pct(list, (a) => a.img).padStart(9)} ${pct(list, (a) => summaries[a.id] || a.x).padStart(9)}  ${health[s.id].ok}/${health[s.id].feeds}`);
     }
     log('\ntemas:');
     for (const t of TOPICS) log(`  ${t.id.padEnd(14)} ${articles.filter((a) => a.tp?.includes(t.id)).length}`);
@@ -200,6 +215,11 @@ export async function build({ report = false } = {}) {
     const en = articles.filter((a) => sourcesById[a.s].lang === 'en');
     log(`\ntraduzidas: ${en.filter((a) => a.tt).length} de ${en.length} matérias em inglês`);
     for (const a of en.filter((a) => a.tt).slice(0, 6)) log(`  ${a.s}: ${a.t}\n     → ${a.tt}${a.tx ? `\n     → ${a.tx.slice(0, 140)}` : ''}`);
+    log('\namostra de resumos:');
+    for (const s of SOURCES) {
+      const a = articles.find((x) => x.s === s.id && summaries[x.id]);
+      if (a) log(`  ${s.id.padEnd(16)} ${summaries[a.id][0].slice(0, 160)}${summaries[a.id][1] ? `\n  ${''.padEnd(16)} → ${summaries[a.id][1].slice(0, 160)}` : ''}`);
+    }
     log('\namostra de autores por fonte:');
     for (const s of SOURCES) {
       const ex = articles.filter((a) => a.s === s.id && a.by?.length).slice(0, 3).map((a) => a.by.join(' + '));

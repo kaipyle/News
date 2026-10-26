@@ -7,6 +7,8 @@
 // feeds[].section: politica | mundo | economia | mercados | energia | opiniao | checagem | geral
 // feeds[].bias: sobrescreve o viés do veículo para aquele feed (ex.: página de opinião do WSJ).
 // maxAgeHours: até quanto tempo atrás manter matérias (veículos de ritmo semanal ganham mais).
+// official: fonte primária (banco central, bolsa), não veículo jornalístico; fica fora da régua.
+// titleStrip: trecho burocrático a tirar do começo dos títulos (regex).
 
 export const SOURCES = [
   // ───────────── Brasil ─────────────
@@ -151,6 +153,60 @@ export const SOURCES = [
     owner: 'XP Inc.', url: 'https://www.infomoney.com.br',
     note: 'Centro, com viés pró-mercado. Pertence a uma corretora: útil para o dia a dia da bolsa, não para análise independente do setor financeiro.',
     feeds: [{ url: 'https://www.infomoney.com.br/feed/', section: 'mercados' }],
+  },
+  {
+    id: 'valorinveste', name: 'Valor Investe', short: 'Valor Investe', country: 'BR', lang: 'pt',
+    bias: 0.1, rigor: 'alto', kind: 'Digital', paywall: false,
+    owner: 'Grupo Globo', url: 'https://valorinveste.globo.com',
+    note: 'Centro. Site gratuito de investimentos do Valor Econômico, voltado a quem investe por conta própria.',
+    feeds: [{ url: 'https://valorinveste.globo.com/rss/valorinveste/', section: 'mercados' }],
+  },
+  {
+    id: 'braziljournal', name: 'Brazil Journal', short: 'Brazil Journal', country: 'BR', lang: 'pt',
+    bias: 0.35, rigor: 'alto', kind: 'Digital', paywall: false,
+    owner: 'Independente (Geraldo Samor)', url: 'https://braziljournal.com',
+    note: 'Centro-direita, pró-mercado assumido. Furos sobre empresas, fusões e gestoras; escreve para quem trabalha no mercado financeiro.',
+    feeds: [{ url: 'https://braziljournal.com/feed/', section: 'mercados' }],
+  },
+  {
+    id: 'neofeed', name: 'NeoFeed', short: 'NeoFeed', country: 'BR', lang: 'pt',
+    bias: 0.25, rigor: 'alto', kind: 'Digital', paywall: false,
+    owner: 'Independente', url: 'https://neofeed.com.br',
+    note: 'Centro-direita moderada, pró-mercado. Negócios, startups, venture capital e mercado financeiro, com muitas entrevistas com executivos.',
+    feeds: [{ url: 'https://neofeed.com.br/feed/', section: 'economia' }],
+  },
+  {
+    id: 'bloomberglinea', name: 'Bloomberg Línea Brasil', short: 'Bloomberg Línea', country: 'BR', lang: 'pt',
+    bias: 0, rigor: 'alto', kind: 'Digital', paywall: false,
+    owner: 'Bloomberg Línea (empresa latino-americana com licença da marca Bloomberg)', url: 'https://www.bloomberglinea.com.br',
+    note: 'Centro. Negócios e mercados na América Latina, com acesso ao noticiário da Bloomberg; tom técnico.',
+    feeds: [{ url: 'https://www.bloomberglinea.com.br/arc/outboundfeeds/rss/?outputType=xml', section: 'economia' }],
+  },
+  {
+    id: 'exame', name: 'Exame Invest', short: 'Exame', country: 'BR', lang: 'pt',
+    bias: 0.35, rigor: 'bom', kind: 'Revista', paywall: false,
+    owner: 'Sócios do BTG Pactual', url: 'https://exame.com/invest/',
+    note: 'Centro-direita, pró-mercado. Pertence a sócios de um banco de investimento: útil no dia a dia dos investimentos, com conflito de interesse em temas do setor financeiro.',
+    feeds: [{ url: 'https://exame.com/invest/feed/', section: 'mercados' }],
+  },
+  {
+    id: 'b3', name: 'B3 (Bora Investir)', short: 'B3', country: 'BR', lang: 'pt',
+    bias: 0, rigor: 'fonte primária', kind: 'Bolsa de valores', paywall: false, official: true, maxAgeHours: 120,
+    owner: 'B3 S.A., empresa de capital aberto que opera a bolsa brasileira', url: 'https://borainvestir.b3.com.br/noticias/',
+    note: 'Portal de notícias da própria bolsa. Fonte primária para avisos de negociação (circuit breaker, horários, índices e balanços); não é jornalismo independente e não critica o mercado.',
+    feeds: [{ url: 'https://borainvestir.b3.com.br/noticias/feed/', section: 'mercados' }],
+  },
+  {
+    id: 'bcb', name: 'Banco Central do Brasil', short: 'Banco Central', country: 'BR', lang: 'pt',
+    bias: 0, rigor: 'fonte primária', kind: 'Fonte oficial', paywall: false, official: true, maxAgeHours: 168,
+    titleStrip: /^BC\s*-\s*Copom Comunicado\s*-\s*\d+ª Reunião\s*-\s*/i,
+    owner: 'Autarquia federal com autonomia garantida em lei (LC 179/2021)', url: 'https://www.bcb.gov.br',
+    note: 'Comunicados do Copom, notas à imprensa e estatísticas oficiais. É a fonte primária sobre juros, câmbio e regras bancárias; as interpretações ficam com os veículos.',
+    feeds: [
+      { url: 'https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/comunicadoscopom', section: 'mercados' },
+      { url: 'https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/notasImprensa', section: 'mercados' },
+      { url: 'https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/noticias', section: 'economia' },
+    ],
   },
   {
     id: 'aosfatos', name: 'Aos Fatos', short: 'Aos Fatos', country: 'BR', lang: 'pt',
@@ -318,6 +374,23 @@ export const SOURCES = [
     owner: 'Graham Holdings', url: 'https://foreignpolicy.com',
     note: 'Centro. Análise de política internacional por especialistas; mais análise do que notícia.',
     feeds: [{ url: 'https://foreignpolicy.com/feed/', section: 'mundo', analysis: true }],
+  },
+  {
+    id: 'cnbc', name: 'CNBC', short: 'CNBC', country: 'US', lang: 'en',
+    bias: -0.1, rigor: 'alto', kind: 'TV e digital', paywall: false,
+    owner: 'NBCUniversal (Comcast)', url: 'https://www.cnbc.com',
+    note: 'Centro. Canal de negócios americano: cobertura rápida de Wall Street e das empresas, com tom de mercado.',
+    feeds: [
+      { url: 'https://www.cnbc.com/id/15839069/device/rss/rss.html', section: 'mercados' },
+      { url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html', section: 'economia' },
+    ],
+  },
+  {
+    id: 'fed', name: 'Federal Reserve', short: 'Fed', country: 'US', lang: 'en',
+    bias: 0, rigor: 'fonte primária', kind: 'Fonte oficial', paywall: false, official: true, maxAgeHours: 168,
+    owner: 'Banco central dos Estados Unidos', url: 'https://www.federalreserve.gov',
+    note: 'Comunicados oficiais do banco central americano: decisões de juros, atas e medidas de supervisão bancária.',
+    feeds: [{ url: 'https://www.federalreserve.gov/feeds/press_all.xml', section: 'mercados' }],
   },
 ];
 

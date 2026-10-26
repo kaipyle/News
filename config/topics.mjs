@@ -66,9 +66,10 @@ export const TOPICS = [
     ],
   },
   {
-    id: 'mercados', label: 'Mercado financeiro', short: 'Mercados',
+    id: 'mercados', label: 'Bolsa, juros e câmbio', short: 'Bolsa',
     words: [
       'ibovespa', 'b3', 'bolsa de valores', 'bolsa brasileira', 'dolar', 'cambio', 'selic', 'copom', 'juros futuros',
+      'dividendo*', 'fundos imobiliarios', 'renda fixa', 'debenture*', 'cvm', 'proventos', 'follow-on', 'small caps',
       'curva de juros', 'tesouro direto', 'titulos publicos', 'circuit breaker', 'investidor*', 'mercado financeiro',
       'wall street', 's&p 500', 'nasdaq', 'dow jones', 'stocks', 'stock market', 'stock exchange', 'share price*',
       'bonds', 'bond market', 'bond yield*', 'treasuries', 'treasury yield*', 'federal reserve', 'rate cut*',

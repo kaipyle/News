@@ -27,6 +27,8 @@ const ICONS = {
   translate: '<path d="M3.5 5.5h9M8 3.5v2M10.5 5.5c-.6 3.6-3 6.4-6.5 8M5.5 8.5c1.2 2.4 3.2 4.2 5.5 5"/><path d="m12.5 20.5 4-9 4 9M13.8 17.6h5.4"/>',
   moon: '<path d="M19.5 14.6A7.5 7.5 0 0 1 9.4 4.5a7.5 7.5 0 1 0 10.1 10.1Z"/>',
   subs: '<path d="M5 4.5h11a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3Z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/>',
+  bank: '<path d="M3.5 9.5 12 4.5l8.5 5"/><path d="M5.5 10v7.5M9.8 10v7.5M14.2 10v7.5M18.5 10v7.5"/><path d="M3.5 19.5h17"/>',
+  story: '<path d="M4 6.5h9M4 12h16M4 17.5h11"/><circle cx="18" cy="6.5" r="2"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4"/><circle cx="12" cy="16.9" r=".6" fill="currentColor"/>',
 };
 const icon = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
@@ -77,7 +79,30 @@ const state = {
   lastFocus: null,
   stack: [],
   renderedHash: null,
+  shards: new Map(), // resumos: arquivo → promessa (baixado só quando o leitor abre um resumo)
+  shardData: new Map(), // resumos já baixados, para abrir sem esperar
 };
+
+// Resumos ficam em data/resumos/<n>.json; o primeiro caractere do id decide o arquivo
+// (mesma conta em lib/summary.mjs).
+const SHARDS = 32;
+const shardOf = (id) => id.charCodeAt(0) % SHARDS;
+function loadShard(id) {
+  const k = shardOf(id);
+  if (!state.shards.has(k)) {
+    // sem conexão (e sem cópia guardada) devolve null e tenta de novo no próximo toque
+    const p = fetch(`data/resumos/${k}.json?v=${state.data.updatedAt}`)
+      .then((r) => (r.ok ? r.json() : {}))
+      .catch(() => null)
+      .then((data) => {
+        if (data) state.shardData.set(k, data);
+        else state.shards.delete(k);
+        return data;
+      });
+    state.shards.set(k, p);
+  }
+  return state.shards.get(k);
+}
 
 function parseRoute() {
   const raw = location.hash.replace(/^#\/?/, '');
@@ -264,22 +289,37 @@ function authorsHtml(a, s) {
 // O separador fica no fim do item anterior: quando a linha quebra, a nova não começa com "·".
 const metaLine = (parts) => parts.map((p, i) => `<span class="mg">${p}${i < parts.length - 1 ? '<span class="sep" aria-hidden="true">·</span>' : ''}</span>`).join(' ');
 
-function card(a) {
+// Régua + veículo + campo. Fonte oficial (banco central, bolsa) não tem linha editorial: fica fora da régua.
+function leanRow(a) {
   const s = state.src[a.s];
+  if (s.official) {
+    return `<div class="lean"><span class="official-mark" aria-hidden="true">${icon('bank')}</span><button class="src-btn" data-fonte="${s.id}">${esc(s.name)}</button><span class="lean-label lane-o">Fonte oficial</span></div>`;
+  }
   const bias = biasOf(a);
-  const flags = a.live ? [`<span class="now is-live">Ao vivo</span>`] : [];
+  return `<div class="lean">${ruler(bias)}<button class="src-btn" data-fonte="${s.id}">${esc(s.name)}</button><span class="lean-label lane-${laneOf(bias)}">${bucketLabel(bias)}${a.b != null ? ' (opinião)' : ''}</span></div>`;
+}
+
+function cardTags(a) {
+  const s = state.src[a.s];
   const tags = [];
   if (translated(a)) tags.push(`<span class="tag-soft" title="Original: ${esc(a.t)}">Traduzido</span>`);
   if (a.op) tags.push(`<span class="tag">Opinião</span>`);
   else if (a.an) tags.push(`<span class="tag">Análise</span>`);
   if (!canRead(s)) tags.push(`<span class="pay" title="Exige assinatura" aria-label="Exige assinatura">${icon('lock')}</span>`);
+  return tags;
+}
+
+function card(a) {
+  const s = state.src[a.s];
+  const flags = a.live ? [`<span class="now is-live">Ao vivo</span>`] : [];
+  const tags = cardTags(a);
   const read = state.read.has(a.id) ? ' is-read' : '';
   return `<article class="card${read}" data-id="${a.id}">
     <div class="card-main">
-      <h3 class="hl"${translated(a) ? ` lang="pt-BR" title="${esc(a.t)}"` : ''}><a href="${esc(linkOf(a))}" target="_blank" rel="noopener" data-read="${a.id}">${esc(titleOf(a))}</a></h3>
+      <h3 class="hl"${translated(a) ? ` lang="pt-BR" title="${esc(a.t)}"` : ''}><a href="${esc(linkOf(a))}" target="_blank" rel="noopener" data-open="${a.id}">${esc(titleOf(a))}</a></h3>
       ${excerptOf(a) ? `<p class="excerpt">${esc(excerptOf(a))}</p>` : ''}
     </div>
-    <div class="lean">${ruler(bias)}<button class="src-btn" data-fonte="${s.id}">${esc(s.name)}</button><span class="lean-label lane-${laneOf(bias)}">${bucketLabel(bias)}${a.b != null ? ' (opinião)' : ''}</span></div>
+    ${leanRow(a)}
     <div class="meta">${metaLine([...flags, authorsHtml(a, s), `<time datetime="${new Date(a.d).toISOString()}" title="${esc(fmtFull.format(a.d))}">${when(a.d)}</time>`, ...tags])}</div>
     ${a.img ? `<img class="thumb" src="${esc(a.img)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}
   </article>`;
@@ -442,7 +482,7 @@ function compareCard(st) {
   const block = (k) => {
     const items = byLane[k].slice(0, 2);
     const body = items.length
-      ? items.map((a) => `<a class="mini" href="${esc(linkOf(a))}" target="_blank" rel="noopener" data-read="${a.id}"><span class="mini-title">${esc(titleOf(a))}</span><span class="mini-src">${esc(state.src[a.s].name)} <span>· ${fmtTime.format(a.d)}</span></span></a>`).join('')
+      ? items.map((a) => `<a class="mini" href="${esc(linkOf(a))}" target="_blank" rel="noopener" data-open="${a.id}"><span class="mini-title">${esc(titleOf(a))}</span><span class="mini-src">${esc(state.src[a.s].name)} <span>· ${fmtTime.format(a.d)}</span></span></a>`).join('')
       : `<p class="lane-empty">Nenhum veículo ${k === 'e' ? 'à esquerda' : k === 'd' ? 'à direita' : 'de centro'} noticiou ainda.</p>`;
     return `<div class="lane-block"><p class="lane-name">${dot(k)}${LANES[k]}${byLane[k].length > 2 ? ` <span>+${byLane[k].length - 2}</span>` : ''}</p>${body}</div>`;
   };
@@ -519,12 +559,12 @@ function contextFonte(r) {
     <h1 class="context-title">${esc(s.name)}</h1>
     <p class="context-line">${esc(s.kind)} · ${esc(state.data.countries[s.country] || s.country)} · ${s.lang === 'pt' ? 'em português' : 'em inglês'}</p>
     <div class="profile">
-      <div class="scale" role="img" aria-label="Linha editorial: ${bucketLabel(s.bias)}">
+      ${s.official ? `<p class="official-note">${icon('bank')}<span>Fonte oficial: comunica decisões e dados da própria instituição. Não é veículo jornalístico, por isso fica fora da régua.</span></p>` : `<div class="scale" role="img" aria-label="Linha editorial: ${bucketLabel(s.bias)}">
         <div class="scale-labels" aria-hidden="true"><span>Esquerda</span><span>Centro</span><span>Direita</span></div>
         ${ruler(s.bias, { w: 320, h: 22, label: false }).replace('width="320"', 'width="100%" preserveAspectRatio="none"')}
-      </div>
+      </div>`}
       <dl class="facts">
-        <dt>Linha editorial</dt><dd>${bucketLabel(s.bias)}</dd>
+        <dt>Linha editorial</dt><dd>${s.official ? 'Fora da régua (fonte oficial)' : bucketLabel(s.bias)}</dd>
         <dt>Rigor de apuração</dt><dd>${esc(s.rigor[0].toUpperCase() + s.rigor.slice(1))}</dd>
         <dt>Dono</dt><dd>${esc(s.owner)}</dd>
         <dt>Acesso</dt><dd>${s.paywall ? `Exige assinatura <button class="chip chip-sm" data-sub="${s.id}" aria-pressed="${state.subs.has(s.id)}">${state.subs.has(s.id) ? 'Você assina' : 'Eu assino'}</button>` : 'Gratuito'}</dd>
@@ -543,7 +583,7 @@ function contextAutor(r, list) {
     <button class="back" data-action="back">${icon('back')} Voltar</button>
     <p class="eyebrow">Jornalista</p>
     <h1 class="context-title">${esc(r.autor)}</h1>
-    <p class="context-line">${plural(list.length, 'matéria', 'matérias')} nas últimas 72 h · ${srcs.map((s) => `<button class="src-btn" data-fonte="${s.id}" style="font-weight:600">${esc(s.name)}</button> <span class="lean-label">(${bucketLabel(s.bias).toLowerCase()})</span>`).join(', ')}</p>
+    <p class="context-line">${plural(list.length, 'matéria', 'matérias')} nas últimas 72 h · ${srcs.map((s) => `<button class="src-btn" data-fonte="${s.id}" style="font-weight:600">${esc(s.name)}</button> <span class="lean-label">(${s.official ? 'fonte oficial' : bucketLabel(s.bias).toLowerCase()})</span>`).join(', ')}</p>
     ${activeFilterPills(r)}
   </div>`;
 }
@@ -570,31 +610,34 @@ function subscriptionsBox(where) {
 
 function renderFontes(main) {
   const all = state.data.sources;
+  const official = all.filter((s) => s.official);
   const counts = {};
   for (const a of state.data.articles) if (Date.now() - a.d < 24 * HOUR) counts[a.s] = (counts[a.s] || 0) + 1;
-  const group = (title, list) => `
-    <div class="src-scale"><h2 class="group-title">${title}</h2><span class="scale-labels" aria-hidden="true"><span>Esq.</span><span>Centro</span><span>Dir.</span></span></div>
+  const group = (title, list, { scale = true } = {}) => !list.length ? '' : `
+    <div class="src-scale"><h2 class="group-title">${title}</h2>${scale ? '<span class="scale-labels" aria-hidden="true"><span>Esq.</span><span>Centro</span><span>Dir.</span></span>' : ''}</div>
     <ul class="src-list">${[...list].sort((a, b) => a.bias - b.bias || a.name.localeCompare(b.name)).map((s) => {
       const down = state.data.health?.[s.id]?.ok === 0;
       return `<li class="src-item"><button class="src-row" data-fonte="${s.id}">
         <span class="src-text"><span class="src-name">${esc(s.name)}</span>
-        <span class="src-sub"><span class="lean-label lane-${laneOf(s.bias)}">${bucketLabel(s.bias)}</span> · rigor ${esc(s.rigor)}${s.paywall ? (state.subs.has(s.id) ? ' · <span class="subbed">assinante</span>' : ` · ${icon('lock', 'lock')}`) : ''} · ${down ? '<span class="src-down">fora do ar</span>' : `${counts[s.id] || 0} hoje`}</span></span>
-        <span class="src-meter">${ruler(s.bias, { w: 120, h: 16 })}</span>
+        <span class="src-sub">${s.official ? `<span class="lean-label lane-o">${esc(s.kind)}</span>` : `<span class="lean-label lane-${laneOf(s.bias)}">${bucketLabel(s.bias)}</span> · rigor ${esc(s.rigor)}`}${s.paywall ? (state.subs.has(s.id) ? ' · <span class="subbed">assinante</span>' : ` · ${icon('lock', 'lock')}`) : ''} · ${down ? '<span class="src-down">fora do ar</span>' : `${counts[s.id] || 0} hoje`}</span></span>
+        <span class="src-meter">${s.official ? `<span class="official-mark">${icon('bank')}</span>` : ruler(s.bias, { w: 120, h: 16 })}</span>
         ${icon('chevron', 'chev')}
       </button></li>`;
     }).join('')}</ul>`;
   main.innerHTML = `
-    <div class="section-head"><p class="eyebrow">${all.length} veículos</p><h1 class="section-title">Fontes</h1>
+    <div class="section-head"><p class="eyebrow">${all.length - official.length} veículos e ${official.length} fontes oficiais</p><h1 class="section-title">Fontes</h1>
     <p class="section-sub">Escolhidas por rigor de apuração, com linhas editoriais diferentes de propósito. Toque num veículo para ver o perfil e só as matérias dele.</p></div>
     ${subscriptionsBox('fontes')}
-    ${group('Brasil', all.filter((s) => s.country === 'BR'))}
-    ${group('Internacional', all.filter((s) => s.country !== 'BR'))}
+    ${group('Brasil', all.filter((s) => s.country === 'BR' && !s.official))}
+    ${group('Internacional', all.filter((s) => s.country !== 'BR' && !s.official))}
+    ${group('Fontes oficiais', official, { scale: false })}
     <h2 class="group-title" style="margin-top:32px">Como classificamos</h2>
     <div class="prose">
       <p><strong>A régua mede o veículo, não a matéria.</strong> Ela resume a linha editorial: escolha de pautas, enquadramento, editoriais e colunistas. Um jornal de centro publica colunas de esquerda e de direita; um veículo de esquerda também faz reportagem factual.</p>
       <p><strong>Internacionais:</strong> posição baseada nas avaliações públicas do AllSides e do Ad Fontes Media. <strong>Brasileiros:</strong> não existe auditoria independente equivalente; a posição é uma avaliação editorial do Mirante, explicada no perfil de cada veículo.</p>
       <p><strong>Rigor</strong> é outra coisa: mede checagem, correções públicas e histórico de acertos. Ficaram de fora veículos de alto alcance com histórico de sensacionalismo ou desinformação.</p>
       <p>O WSJ tem duas réguas: reportagem perto do centro, página de opinião à direita. As matérias de opinião dele aparecem marcadas como tal.</p>
+      <p><strong>Fontes oficiais</strong> (B3, Banco Central, Federal Reserve) publicam decisões e dados da própria instituição. Não são jornalismo e não entram na régua: servem para conferir na origem o que os veículos noticiam.</p>
     </div>`;
 }
 
@@ -614,7 +657,7 @@ function render() {
   else if (r.view === 'fontes') renderFontes(main);
   else if (r.view === 'brasil') renderBrasil(main, r);
   else if (r.view === 'mundo') renderSimpleSection(main, r, { title: 'Mundo', sub: 'Política internacional, guerras e conflitos. Matérias sobre o Brasil ficam na aba Brasil.' });
-  else if (r.view === 'economia') renderSimpleSection(main, r, { title: 'Economia', sub: 'Mercado financeiro, petróleo e energia, economia brasileira e global.' });
+  else if (r.view === 'economia') renderSimpleSection(main, r, { title: 'Economia', sub: 'Bolsa, juros e câmbio, petróleo e energia, economia brasileira e global.' });
   else renderInicio(main, r);
   document.title = r.fonte ? `${state.src[r.fonte]?.name} · Mirante` : r.autor ? `${r.autor} · Mirante` : r.view === 'inicio' ? 'Mirante' : `${VIEWS.find((v) => v.id === r.view).label} · Mirante`;
 }
@@ -722,6 +765,58 @@ function openStory(id) {
   const title = storyTitle(st);
   openSheet(title.length > 60 ? 'Mesma pauta' : title, body);
   $('#sheet').dataset.kind = 'story';
+  $('#sheet').dataset.story = id;
+}
+
+// ── Resumo: abre ao tocar na matéria; dali o leitor decide se vai ao site do veículo ──
+
+function markRead(id) {
+  state.read.add(id);
+  store.set('read', [...state.read].slice(-3000));
+  document.querySelectorAll(`.card[data-id="${id}"]`).forEach((c) => c.classList.add('is-read'));
+}
+
+function summaryText(a, entry, failed = false) {
+  const s = state.src[a.s];
+  const [rs, trs] = entry || [];
+  if (failed && !a.x) return `<p class="summary-empty">Não deu para carregar o resumo agora (sem conexão?). Abra a matéria para ler.</p>`;
+  if (translated(a)) {
+    if (trs || a.tx) return `<p class="summary-text" lang="pt-BR">${esc(trs || a.tx)}</p><p class="summary-note">Tradução automática do início da matéria.</p>`;
+    if (rs || a.x) return `<p class="summary-text">${esc(rs || a.x)}</p><p class="summary-note">Resumo ainda sem tradução.</p>`;
+  } else if (rs || a.x) {
+    return `<p class="summary-text">${esc(rs || a.x)}</p><p class="summary-note">${s.official ? 'Início do comunicado oficial.' : 'Início da matéria, como publicado pelo veículo.'}</p>`;
+  }
+  return `<p class="summary-empty">${s.googleNews ? `A ${esc(s.short)} chega pelo Google Notícias, sem resumo.` : 'Este veículo não oferece resumo.'} Abra a matéria para ler.</p>`;
+}
+
+function openSummary(id, { back = '' } = {}) {
+  const a = state.byId.get(id);
+  if (!a) return;
+  const s = state.src[a.s];
+  markRead(id);
+  const ready = state.shardData.get(shardOf(id));
+  const story = state.data.stories.find((st) => st.ids.length > 1 && st.ids.includes(id) && st.id !== back);
+  const flags = a.live ? [`<span class="now is-live">Ao vivo</span>`] : [];
+  const body = `<article class="summary">
+    ${leanRow(a)}
+    <h3 class="summary-hl"${translated(a) ? ' lang="pt-BR"' : ''}>${esc(titleOf(a))}</h3>
+    <div class="meta">${metaLine([...flags, authorsHtml(a, s), `<time datetime="${new Date(a.d).toISOString()}">${when(a.d)}</time>`, ...cardTags(a)])}</div>
+    ${a.img ? `<img class="summary-img" src="${esc(a.img)}" alt="" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}
+    <div class="summary-body">${ready ? summaryText(a, ready[id]) : '<div class="sk-lines" aria-label="Carregando resumo"><i></i><i></i><i></i><i></i></div>'}</div>
+    ${story ? `<button class="summary-story" data-story="${story.id}">${icon('story')}<span>Mesma pauta em ${plural(story.ids.length, 'veículo', 'veículos')}<small>${spreadText(story.lanes)}</small></span>${icon('chevron', 'chev')}</button>` : ''}
+  </article>`;
+  const open = `<a class="btn btn-open" href="${esc(linkOf(a))}" target="_blank" rel="noopener" data-read="${a.id}">${!canRead(s) ? icon('lock') : ''}Ler a matéria${icon('out')}</a>`;
+  const foot = back ? `<button class="btn btn-ghost btn-back" data-story="${back}">${icon('back')}Voltar</button>${open}` : open;
+  openSheet('Resumo', body, foot);
+  const sheet = $('#sheet');
+  sheet.dataset.kind = 'summary';
+  sheet.dataset.id = id;
+  if (!ready) {
+    loadShard(id).then((data) => {
+      if (sheet.dataset.kind !== 'summary' || sheet.dataset.id !== id) return;
+      $('.summary-body', sheet).innerHTML = summaryText(a, data?.[id], !data);
+    });
+  }
 }
 
 function openHelp() {
@@ -732,7 +827,7 @@ function openHelp() {
     <p>Fica logo abaixo do título e mostra a <strong>linha editorial do veículo</strong>, da esquerda para a direita. A marca central é o centro. Ela não julga cada matéria: veículo de esquerda também faz reportagem factual, e o contrário vale para a direita.</p>
     <p>As cores seguem o campo: <span class="lean-label lane-e">roxo à esquerda</span>, <span class="lean-label lane-c">cinza no centro</span> e <span class="lean-label lane-d">laranja à direita</span>. A barra cresce do centro até a agulha: quanto mais longa, mais distante do centro. Não usamos vermelho e azul porque significam coisas opostas no Brasil e nos EUA.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Navegar</h3>
-    <p><strong>Toque no título</strong> para abrir a matéria no site do veículo. <strong>Toque no nome do jornal</strong> para ver o perfil (dono, linha editorial, rigor) e só as matérias dele. <strong>Toque no autor</strong> para ver tudo o que ele publicou.</p>
+    <p><strong>Toque na matéria</strong> para ler o resumo: a linha fina e o começo do texto, como o veículo publicou. Dali, <strong>Ler a matéria</strong> abre o site do veículo. No computador, Ctrl ou ⌘ + clique abre direto. <strong>Toque no nome do jornal</strong> para ver o perfil (dono, linha editorial, rigor) e só as matérias dele. <strong>Toque no autor</strong> para ver tudo o que ele publicou.</p>
     <p>Os <strong>temas</strong> logo abaixo do topo filtram a seção com um toque. <strong>Filtros</strong>, no menu, combina linha editorial, tema, região, país, idioma e tipo de texto.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Brasil: os dois lados</h3>
     <p>A aba Brasil mostra a política nacional separada por campo. <strong>Mesma pauta</strong> junta o mesmo fato contado por veículos diferentes; quando um lado não noticia, isso aparece.</p>
@@ -762,10 +857,18 @@ document.addEventListener('click', (ev) => {
   const t = ev.target.closest('button, a, [data-action]');
   if (!t) return;
 
+  if (t.dataset.open) {
+    // Ctrl/Cmd/Shift + clique abre direto no site, como qualquer link
+    if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return markRead(t.dataset.open);
+    ev.preventDefault();
+    const sheet = $('#sheet');
+    const back = !sheet.hidden && sheet.dataset.kind === 'story' ? sheet.dataset.story : '';
+    return openSummary(t.dataset.open, { back });
+  }
   if (t.dataset.read) {
-    state.read.add(t.dataset.read);
-    store.set('read', [...state.read].slice(-3000));
-    t.closest('.card')?.classList.add('is-read');
+    markRead(t.dataset.read);
+    // o link abre o site numa aba nova; ao voltar, o leitor encontra a lista, não o resumo
+    if (t.closest('#sheet')) setTimeout(closeSheet, 0);
     return;
   }
   if (t.dataset.fonte) { closeSheet(); return go({ ...EMPTY, view: 'inicio', fonte: t.dataset.fonte }); }
@@ -874,6 +977,11 @@ document.addEventListener('keydown', (ev) => {
 });
 
 window.addEventListener('popstate', () => { closeSheet(); onRoute(); });
+// o resumo começa a baixar no toque, antes do clique terminar
+document.addEventListener('pointerdown', (ev) => {
+  const t = ev.target.closest?.('[data-open]');
+  if (t && state.data) loadShard(t.dataset.open);
+}, { passive: true });
 window.addEventListener('hashchange', () => onRoute());
 window.addEventListener('online', render);
 window.addEventListener('offline', render);
@@ -992,6 +1100,7 @@ new ResizeObserver(measureHead).observe($('.top'));
 // ───────────────────────── Carga e atualização ─────────────────────────
 
 function ingest(data) {
+  if (state.data?.updatedAt !== data.updatedAt) { state.shards.clear(); state.shardData.clear(); }
   state.data = data;
   state.src = Object.fromEntries(data.sources.map((s) => [s.id, s]));
   state.byId = new Map(data.articles.map((a) => [a.id, a]));
