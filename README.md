@@ -20,12 +20,14 @@ As notícias são atualizadas a cada 15 minutos. O app funciona como aplicativo 
 1. O GitHub Pages gratuito só publica repositórios **públicos**. Em *Settings → General → Danger Zone → Change visibility*, torne o repositório público (o código não tem nada sigiloso), **ou** use um plano GitHub Pro.
 2. *Settings → Pages → Build and deployment → Source*: escolha **GitHub Actions**.
 3. Leve este código para a branch `main` (merge do pull request).
-4. Em *Actions → Atualizar notícias → Run workflow*, rode a primeira vez. Depois disso ele roda sozinho a cada 15 minutos.
+4. Em *Actions → Atualizar notícias → Run workflow*, rode a primeira vez. Depois disso cada rodada dispara a seguinte, a cada 15 minutos (o agendamento do GitHub atrasa e às vezes nem dispara, então fica só como reserva).
 5. Abra `https://<seu-usuário>.github.io/News/` no celular:
    - **iPhone (Safari)**: Compartilhar → *Adicionar à Tela de Início*.
    - **Android (Chrome)**: menu ⋮ → *Instalar app*.
 
-> Repositório privado com GitHub Pro: o plano inclui 3.000 minutos de Actions por mês. Rodar a cada 15 min gasta cerca de 2.900. Para folga, mude o `cron` em `.github/workflows/update.yml` para `'7,37 * * * *'` (a cada 30 min).
+> Em repositório público, os minutos de Actions são gratuitos. Em repositório privado não use a corrente: entre uma rodada e outra ela deixa uma máquina esperando, o que gastaria cerca de 43 mil minutos por mês. Crie a variável `ATUALIZACAO_CONTINUA` com o valor `off` (*Settings → Secrets and variables → Actions → Variables*) e use o `cron` em `.github/workflows/update.yml`, por exemplo `'7,37 * * * *'` (a cada 30 min, cerca de 1.500 minutos por mês).
+>
+> Para parar as atualizações: desative o workflow em *Actions → Atualizar notícias → ⋯ → Disable workflow*, ou crie a mesma variável com `off`.
 
 ### Opção B — seu computador como servidor
 
