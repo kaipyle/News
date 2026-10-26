@@ -40,6 +40,8 @@ jobs:
         env:
           # reaproveita autores, imagens e matérias que já saíram do RSS
           PREVIOUS_FEED_URL: ${{ steps.pages.outputs.base_url }}/data/feed.json
+      - name: Carimbar a versão do app
+        run: node scripts/stamp-version.mjs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public

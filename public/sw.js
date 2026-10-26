@@ -1,5 +1,5 @@
 // Service worker: abre o app sem rede e guarda a última coleta de notícias.
-const VERSION = 'mirante-v8';
+const VERSION = 'mirante-v9';
 const SHELL = [
   './', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
@@ -27,8 +27,10 @@ self.addEventListener('fetch', (e) => {
   if (url.pathname.includes('/data/') || url.pathname.endsWith('version.json') || e.request.mode === 'navigate' || /\.(html|js|css)$/.test(url.pathname)) {
     // o app pede as notícias com "?t=..." para furar o cache do site; a cópia offline fica numa chave só
     const key = url.search ? new Request(url.origin + url.pathname) : e.request;
+    // a página sempre confere com o site (sem usar cópia do navegador), para apontar para o CSS/JS certos
+    const req = e.request.mode === 'navigate' ? new Request(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }) : e.request;
     e.respondWith(
-      fetch(e.request)
+      fetch(req)
         .then((res) => {
           if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(key, copy)); }
           return res;
