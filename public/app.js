@@ -111,7 +111,7 @@ function go(patch, { replace = false, fresh = false } = {}) {
   onRoute({ replace });
 }
 
-const filterCount = (r) => r.tema.length + r.lado.length + r.pais.length + (r.idioma ? 1 : 0) + (r.tipo ? 1 : 0) + (state.readable ? 1 : 0);
+const filterCount = (r) => r.tema.length + r.lado.length + r.pais.length + (r.idioma ? 1 : 0) + (r.tipo ? 1 : 0);
 const canRead = (s) => !s.paywall || state.subs.has(s.id);
 
 // ───────────────────────── Dados ─────────────────────────
@@ -377,7 +377,6 @@ function activeFilterPills(r) {
   for (const c of r.pais) pill(state.data.countries[c] || c, { pais: r.pais.filter((x) => x !== c) });
   if (r.idioma) pill(r.idioma === 'pt' ? 'Em português' : 'Em inglês', { idioma: '' });
   if (r.tipo) pill(r.tipo === 'opiniao' ? 'Só opinião e análise' : 'Só notícias', { tipo: '' });
-  if (state.readable) pills.push(`<button class="pill" data-action="readable-off">Só o que consigo ler ${icon('close')}</button>`);
   if (r.q) pill(`“${r.q}”`, { q: '' });
   if (!pills.length) return '';
   if (pills.length > 1) pills.push(`<button class="pill pill-clear" data-action="clear-filters">Limpar tudo</button>`);
@@ -388,6 +387,7 @@ function emptyState(r) {
   const any = filterCount(r) || r.q;
   return `<div class="empty"><h2>Nenhuma matéria aqui</h2>
     <p>${any ? 'Os filtros escolhidos não deixaram nenhuma matéria das últimas 72 horas.' : 'Ainda não há matérias nesta seção. A próxima coleta acontece em alguns minutos.'}</p>
+    ${state.readable ? `<p>Você está vendo só jornais gratuitos e os que assina (cadeado no topo ligado).</p><button class="btn btn-ghost" data-action="paywall">Mostrar também os pagos</button> ` : ''}
     ${any ? `<button class="btn" data-action="clear-filters">Limpar filtros</button>` : ''}
     ${r.q && r.view !== 'inicio' ? ` <a class="btn btn-ghost" href="${buildHash({ ...r, view: 'inicio' })}">Buscar em todas as seções</a>` : ''}</div>`;
 }
@@ -555,8 +555,8 @@ function renderScoped(main, r) {
 function subscriptionsBox(where) {
   const paid = state.data.sources.filter((s) => s.paywall).sort((a, b) => a.short.localeCompare(b.short));
   const n = state.subs.size;
-  return `<section class="subs${where === 'fontes' ? ' subs-card' : ''}" aria-labelledby="subs-${where}">
-    <h3 id="subs-${where}" class="${where === 'fontes' ? 'group-title' : ''}">O que você consegue ler</h3>
+  return `<section class="subs${where === 'fontes' ? ' subs-card' : ''}" aria-label="O que você consegue ler">
+    ${where === 'sheet' ? '' : `<h3 class="${where === 'fontes' ? 'group-title' : ''}">O que você consegue ler</h3>`}
     <label class="switch"><span>Só gratuitos e minhas assinaturas</span><input type="checkbox" data-action="toggle-readable" ${state.readable ? 'checked' : ''}></label>
     <p class="fhint">Toque nos jornais pagos que você assina${n ? ` (${n} marcado${n > 1 ? 's' : ''})` : ''}:</p>
     <div class="fchips">${paid.map((s) => `<button class="chip" data-sub="${s.id}" aria-pressed="${state.subs.has(s.id)}">${esc(s.short)}</button>`).join('')}</div>
@@ -682,7 +682,19 @@ function openFilters() {
   openSheet('Filtros', filtersBody(), filtersFoot());
   $('#sheet').dataset.kind = 'filters';
 }
+function openSubs({ first = false } = {}) {
+  const intro = first
+    ? 'Marque os jornais pagos que você assina. Eles continuam aparecendo; os outros pagos ficam ocultos até você tocar no cadeado de novo.'
+    : 'Os jornais marcados continuam aparecendo com o cadeado ligado; os demais pagos ficam ocultos.';
+  openSheet('Suas assinaturas', `<p class="section-sub" style="margin:0 0 10px">${intro}</p>${subscriptionsBox('sheet')}`, '<button class="btn" data-action="close-sheet">Pronto</button>');
+  $('#sheet').dataset.kind = 'subs';
+}
+
 function refreshFilters() {
+  if ($('#sheet').dataset.kind === 'subs') {
+    $('#sheet .sheet-body').innerHTML = $('#sheet .sheet-body p').outerHTML + subscriptionsBox('sheet');
+    return;
+  }
   if ($('#sheet').dataset.kind !== 'filters') return;
   const body = $('#sheet .sheet-body');
   const top = body.scrollTop;
@@ -724,7 +736,7 @@ function openHelp() {
     <h3 class="lane-tag" style="margin:20px 0 8px">Atualização</h3>
     <p>As fontes são lidas a cada 15 minutos. Última coleta: ${esc(updated)}. Quando chegam matérias novas, um aviso aparece no topo.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Minhas assinaturas</h3>
-    <p>Em <strong>Filtros</strong> (ou na aba Fontes), toque nos jornais pagos que você assina e ligue <strong>Só gratuitos e minhas assinaturas</strong>: o app passa a mostrar só o que você consegue abrir, e o cadeado some dos jornais que você assina. A escolha fica salva neste aparelho; no computador e no celular ela é feita separadamente.</p>
+    <p>Toque no <strong>cadeado</strong> no topo para esconder os jornais pagos que você não assina; toque de novo para mostrar todos. Ele fica ligado até você desligar, em qualquer aba ou tema. Para dizer quais jornais você assina, use o botão <strong>Assinaturas</strong> do aviso, a seção no topo dos <strong>Filtros</strong> ou a aba <strong>Fontes</strong>. Fica salvo neste aparelho: no computador e no celular a escolha é feita separadamente.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Tradução</h3>
     <p>O botão <strong>文A</strong> no topo mostra as matérias em inglês em português: título e resumo traduzidos automaticamente (marcados com "Traduzido") e a matéria abre pelo Google Tradutor. Toque de novo para voltar ao original. Sites com paywall podem não abrir traduzidos; no iPhone, o Safari também traduz pelo botão <strong>aA</strong> da barra de endereço.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Colocar na tela do celular</h3>
@@ -755,7 +767,8 @@ document.addEventListener('click', (ev) => {
     const id = t.dataset.sub, name = state.src[id].short;
     if (state.subs.has(id)) state.subs.delete(id); else state.subs.add(id);
     store.set('subs', [...state.subs]);
-    toast(state.subs.has(id) ? `${name} marcado como assinatura` : `${name} removido das assinaturas`);
+    // dentro da folha o próprio botão já mostra o estado; o aviso cobriria os botões
+    if (!t.closest('#sheet')) toast(state.subs.has(id) ? `Assinatura adicionada: ${name}` : `Assinatura removida: ${name}`);
     render();
     return refreshFilters();
   }
@@ -782,11 +795,16 @@ document.addEventListener('click', (ev) => {
       toast(state.translate ? 'Matérias em inglês agora aparecem em português' : 'Mostrando os textos no idioma original');
       return render();
     case 'close-sheet': return closeSheet();
-    case 'readable-off':
-      setReadable(false);
-      return;
+    case 'paywall':
+      // primeira vez sem assinaturas marcadas: pergunta quais jornais o leitor assina
+      if (!state.readable && !state.subs.size && !store.get('subs-asked', false)) {
+        store.set('subs-asked', true);
+        setReadable(true, { quiet: true });
+        return openSubs({ first: true });
+      }
+      return setReadable(!state.readable);
+    case 'edit-subs': return openSubs();
     case 'clear-filters':
-      if (state.readable) setReadable(false, { quiet: true });
       go({ tema: [], lado: [], pais: [], idioma: '', tipo: '', q: '' }, { replace: true });
       $('#q').value = '';
       return refreshFilters();
@@ -843,16 +861,26 @@ window.addEventListener('offline', render);
 let lastWide = matchMedia('(min-width: 960px)').matches;
 matchMedia('(min-width: 960px)').addEventListener('change', (e) => { if (e.matches !== lastWide) { lastWide = e.matches; render(); } });
 
+// Preferência persistente: só muda quando o leitor toca no cadeado (ou no interruptor).
 function setReadable(on, { quiet = false } = {}) {
   state.readable = on;
   store.set('readable', on);
+  syncPaywallButton();
   if (!quiet) {
     toast(on
-      ? (state.subs.size ? 'Mostrando só gratuitos e suas assinaturas' : 'Mostrando só veículos gratuitos. Marque suas assinaturas para incluí-las')
-      : 'Mostrando todos os veículos');
+      ? (state.subs.size ? 'Pagos que você não assina estão ocultos' : 'Só jornais gratuitos. Marque suas assinaturas para incluí-las')
+      : 'Mostrando todos os jornais, inclusive pagos', on ? { label: 'Assinaturas', action: 'edit-subs' } : null);
   }
   render();
   refreshFilters();
+}
+
+function syncPaywallButton() {
+  const b = $('[data-action="paywall"]');
+  b.setAttribute('aria-pressed', String(state.readable));
+  const label = state.readable ? 'Pagos que você não assina estão ocultos. Toque para mostrar todos' : 'Ocultar jornais pagos que você não assina';
+  b.setAttribute('aria-label', label);
+  b.title = label;
 }
 
 function syncTranslateButton() {
@@ -863,12 +891,12 @@ function syncTranslateButton() {
 }
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, act = null) {
   const el = $('.toast');
-  el.textContent = msg;
+  el.innerHTML = `<span>${esc(msg)}</span>${act ? `<button data-action="${act.action}">${esc(act.label)}</button>` : ''}`;
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
+  toastTimer = setTimeout(() => { el.hidden = true; }, act ? 4500 : 2600);
 }
 
 function measureHead() {
@@ -944,5 +972,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 
 state.route = parseRoute();
 syncTranslateButton();
+syncPaywallButton();
 renderChrome();
 load();

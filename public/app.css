@@ -198,11 +198,17 @@ main { max-width: var(--col); margin: 0 auto; padding: 0 var(--gutter) 40px; out
 
 .toast {
   position: fixed; z-index: 45; left: 50%; transform: translateX(-50%);
-  bottom: calc(var(--tab-h) + var(--safe-b) + 14px); max-width: calc(100% - 32px);
+  bottom: calc(var(--tab-h) + var(--safe-b) + 14px); width: max-content; max-width: calc(100% - 32px);
+  display: flex; align-items: center; gap: 14px;
   background: var(--ink); color: var(--paper); border-radius: 10px; padding: 10px 14px;
   font: 550 13.5px/1.35 var(--sans); box-shadow: 0 8px 24px rgb(0 0 0 / .2); animation: rise .2s ease-out;
 }
 @media (min-width: 960px) { .toast { bottom: 24px; } }
+.toast button { flex: none; color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; padding: 4px 0; }
+@media (max-width: 374px) {
+  .icon-btn { width: 36px; }
+  .brand-name { font-size: 19px; }
+}
 
 .notice {
   display: flex; gap: 10px; align-items: flex-start; margin: 14px 0 4px; padding: 12px 12px 12px 14px;
