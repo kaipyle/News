@@ -625,7 +625,7 @@ function renderFontes(main) {
       </button></li>`;
     }).join('')}</ul>`;
   main.innerHTML = `
-    <div class="section-head"><p class="eyebrow">${all.length - official.length} veículos e ${official.length} fontes oficiais</p><h1 class="section-title">Fontes</h1>
+    <div class="section-head"><p class="eyebrow">${all.length - official.length} veículos${official.length ? ` e ${official.length} fontes oficiais` : ''}</p><h1 class="section-title">Fontes</h1>
     <p class="section-sub">Escolhidas por rigor de apuração, com linhas editoriais diferentes de propósito. Toque num veículo para ver o perfil e só as matérias dele.</p></div>
     ${subscriptionsBox('fontes')}
     ${group('Brasil', all.filter((s) => s.country === 'BR' && !s.official))}
