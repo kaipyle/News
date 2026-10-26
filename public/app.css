@@ -144,6 +144,7 @@ svg { display: block; }
 .menu-dot { position: absolute; top: 6px; right: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--paper); }
 
 .menu { position: fixed; inset: 0; z-index: 42; }
+.menu:not(.is-open) { pointer-events: none; } /* fechando: o próximo toque já vai para a tela */
 .menu-scrim {
   position: absolute; inset: 0; background: rgb(6 7 9 / .58);
   -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
