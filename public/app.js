@@ -254,7 +254,7 @@ function card(a) {
   const bias = biasOf(a);
   const flags = a.live ? [`<span class="now is-live">Ao vivo</span>`] : [];
   const tags = [];
-  if (translated(a)) tags.push(`<span class="tag-soft" title="Original: ${esc(a.t)}">Traduzido do inglês</span>`);
+  if (translated(a)) tags.push(`<span class="tag-soft" title="Original: ${esc(a.t)}">Traduzido</span>`);
   if (a.op) tags.push(`<span class="tag">Opinião</span>`);
   else if (a.an) tags.push(`<span class="tag">Análise</span>`);
   if (s.paywall) tags.push(`<span class="pay" title="Exige assinatura" aria-label="Exige assinatura">${icon('lock')}</span>`);
