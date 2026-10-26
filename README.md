@@ -7,6 +7,9 @@ Hub pessoal de notícias: reúne 34 veículos selecionados por rigor de apuraç�
 - **Mundo** e **Economia**: política internacional, guerras, petróleo, mercado financeiro.
 - **Fontes**: perfil de cada veículo (dono, linha editorial, rigor, paywall) e só as matérias dele.
 - Toque no **jornal** ou no **autor** de qualquer matéria para filtrar por ele. Filtros por linha editorial, tema, região, país, idioma e opinião × notícia.
+- **Minhas assinaturas**: marque os jornais pagos que você assina e ligue "Só gratuitos e minhas assinaturas" para ver só o que consegue abrir (fica salvo em cada aparelho).
+- **Tradução**: o botão 文A mostra as matérias em inglês em português e abre o texto pelo Google Tradutor.
+- **Cores da régua**: roxo à esquerda, cinza no centro, laranja à direita (paleta PuOr, segura para daltonismo; vermelho e azul foram evitados porque significam coisas opostas no Brasil e nos EUA).
 
 As notícias são atualizadas a cada 15 minutos. O app funciona como aplicativo instalado na tela do celular (PWA) e abre mesmo sem conexão, com a última coleta.
 

@@ -62,6 +62,8 @@ const state = {
   limit: 30,
   read: new Set(store.get('read', [])),
   translate: store.get('translate', false), // matérias em inglês exibidas em português
+  subs: new Set(store.get('subs', [])), // veículos pagos que o leitor assina
+  readable: store.get('readable', false), // mostrar só gratuitos + assinaturas
   pending: null, // feed novo aguardando o leitor tocar em "novas matérias"
   lastCheck: 0,
   lastFocus: null,
@@ -82,7 +84,6 @@ function parseRoute() {
     pais: list('pais'),
     idioma: p.get('idioma') || '',
     tipo: p.get('tipo') || '',
-    pay: p.get('pay') || '',
     fonte: p.get('fonte') || '',
     autor: p.get('autor') || '',
     q: p.get('q') || '',
@@ -93,13 +94,13 @@ function parseRoute() {
 function buildHash(r) {
   const p = new URLSearchParams();
   for (const k of ['tema', 'lado', 'pais']) if (r[k]?.length) p.set(k, r[k].join(','));
-  for (const k of ['idioma', 'tipo', 'pay', 'fonte', 'autor', 'q']) if (r[k]) p.set(k, r[k]);
+  for (const k of ['idioma', 'tipo', 'fonte', 'autor', 'q']) if (r[k]) p.set(k, r[k]);
   if (r.view === 'brasil' && r.lane && r.lane !== 'todos') p.set('lane', r.lane);
   const qs = p.toString().replace(/%2C/g, ',');
   return `#/${r.view === 'inicio' ? '' : r.view}${qs ? '?' + qs : ''}`;
 }
 
-const EMPTY = { tema: [], lado: [], pais: [], idioma: '', tipo: '', pay: '', fonte: '', autor: '', q: '', lane: 'todos' };
+const EMPTY = { tema: [], lado: [], pais: [], idioma: '', tipo: '', fonte: '', autor: '', q: '', lane: 'todos' };
 
 function go(patch, { replace = false, fresh = false } = {}) {
   const base = fresh ? { ...EMPTY, view: state.route.view } : state.route;
@@ -110,7 +111,8 @@ function go(patch, { replace = false, fresh = false } = {}) {
   onRoute({ replace });
 }
 
-const filterCount = (r) => r.tema.length + r.lado.length + r.pais.length + (r.idioma ? 1 : 0) + (r.tipo ? 1 : 0) + (r.pay ? 1 : 0);
+const filterCount = (r) => r.tema.length + r.lado.length + r.pais.length + (r.idioma ? 1 : 0) + (r.tipo ? 1 : 0) + (state.readable ? 1 : 0);
+const canRead = (s) => !s.paywall || state.subs.has(s.id);
 
 // ───────────────────────── Dados ─────────────────────────
 
@@ -165,7 +167,8 @@ function select(r, { ignoreView = false } = {}) {
     if (r.idioma && s.lang !== r.idioma) return false;
     if (r.tipo === 'opiniao' && !(a.op || a.an)) return false;
     if (r.tipo === 'noticia' && (a.op || a.an)) return false;
-    if (r.pay === '0' && s.paywall) return false;
+    // "só o que consigo ler" vale para as listas; quem abre um veículo ou autor quer ver tudo dele
+    if (state.readable && !(r.fonte || r.autor) && !canRead(s)) return false;
     if (terms.length && !terms.every((t) => hay(a).includes(t))) return false;
     return true;
   });
@@ -222,8 +225,8 @@ const plural = (n, one, many) => `${n.toLocaleString('pt-BR')} ${n === 1 ? one :
 // ───────────────────────── Peças ─────────────────────────
 
 // Régua: medidor de pan esquerda ↔ direita. 9 marcas, a central mais alta; a agulha é o veículo.
-function ruler(bias, { w = 46, h = 12, label = true } = {}) {
-  const pad = 2, span = w - pad * 2;
+function ruler(bias, { w = 52, h = 14, label = true } = {}) {
+  const pad = 2, span = w - pad * 2, lane = laneOf(bias);
   let ticks = '';
   for (let i = 0; i <= 8; i++) {
     const x = pad + (span * i) / 8;
@@ -231,9 +234,13 @@ function ruler(bias, { w = 46, h = 12, label = true } = {}) {
     ticks += `<line class="tick${i === 4 ? ' mid' : ''}" x1="${x}" x2="${x}" y1="${(h - th) / 2 + 0.5}" y2="${(h + th) / 2 - 0.5}"/>`;
   }
   const nx = pad + ((Math.max(-1, Math.min(1, bias)) + 1) / 2) * span;
+  const cx = pad + span / 2;
   const nw = Math.max(3, h * 0.26);
+  // barra do centro até a agulha: o comprimento mostra o quanto o veículo se afasta do centro
+  const fh = Math.max(3, h * 0.34);
+  const fill = Math.abs(nx - cx) > nw / 2 ? `<rect class="fill" x="${Math.min(nx, cx).toFixed(1)}" y="${((h - fh) / 2).toFixed(1)}" width="${Math.abs(nx - cx).toFixed(1)}" height="${fh.toFixed(1)}" rx="${(fh / 2).toFixed(1)}"/>` : '';
   const aria = label ? `role="img" aria-label="Linha editorial: ${bucketLabel(bias)}"` : 'aria-hidden="true"';
-  return `<svg class="ruler" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" ${aria}>${ticks}<rect class="needle" x="${(nx - nw / 2).toFixed(1)}" y="0" width="${nw}" height="${h}" rx="${nw / 2}"/></svg>`;
+  return `<svg class="ruler lane-${lane}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" ${aria}>${ticks}${fill}<rect class="needle" x="${(nx - nw / 2).toFixed(1)}" y="0" width="${nw}" height="${h}" rx="${nw / 2}"/></svg>`;
 }
 
 function authorsHtml(a, s) {
@@ -257,14 +264,14 @@ function card(a) {
   if (translated(a)) tags.push(`<span class="tag-soft" title="Original: ${esc(a.t)}">Traduzido</span>`);
   if (a.op) tags.push(`<span class="tag">Opinião</span>`);
   else if (a.an) tags.push(`<span class="tag">Análise</span>`);
-  if (s.paywall) tags.push(`<span class="pay" title="Exige assinatura" aria-label="Exige assinatura">${icon('lock')}</span>`);
+  if (!canRead(s)) tags.push(`<span class="pay" title="Exige assinatura" aria-label="Exige assinatura">${icon('lock')}</span>`);
   const read = state.read.has(a.id) ? ' is-read' : '';
   return `<article class="card${read}" data-id="${a.id}">
     <div class="card-main">
       <h3 class="hl"${translated(a) ? ` lang="pt-BR" title="${esc(a.t)}"` : ''}><a href="${esc(linkOf(a))}" target="_blank" rel="noopener" data-read="${a.id}">${esc(titleOf(a))}</a></h3>
       ${excerptOf(a) ? `<p class="excerpt">${esc(excerptOf(a))}</p>` : ''}
     </div>
-    <div class="lean">${ruler(bias)}<button class="src-btn" data-fonte="${s.id}">${esc(s.name)}</button><span class="lean-label">${bucketLabel(bias)}${a.b != null ? ' (opinião)' : ''}</span></div>
+    <div class="lean">${ruler(bias)}<button class="src-btn" data-fonte="${s.id}">${esc(s.name)}</button><span class="lean-label lane-${laneOf(bias)}">${bucketLabel(bias)}${a.b != null ? ' (opinião)' : ''}</span></div>
     <div class="meta">${metaLine([...flags, authorsHtml(a, s), `<time datetime="${new Date(a.d).toISOString()}" title="${esc(fmtFull.format(a.d))}">${when(a.d)}</time>`, ...tags])}</div>
     ${a.img ? `<img class="thumb" src="${esc(a.img)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}
   </article>`;
@@ -276,6 +283,7 @@ function spread(lanes) {
   return `<span class="spread" aria-hidden="true">${seg('e')}${seg('c')}${seg('d')}</span>`;
 }
 const spreadText = (l) => `E ${l.e} · C ${l.c} · D ${l.d}`;
+const dot = (k) => `<i class="dot lane-${k}" aria-hidden="true"></i>`;
 const spreadAria = (l) => `${l.e} à esquerda, ${l.c} de centro, ${l.d} à direita`;
 
 function storyCard(st) {
@@ -336,7 +344,7 @@ function resetObserver() {
 
 function renderChrome() {
   const r = state.route;
-  const tabs = VIEWS.map((v) => `<a class="tab" href="#/${v.id === 'inicio' ? '' : v.id}" ${r.view === v.id && !r.fonte && !r.autor ? 'aria-current="page"' : ''}>${icon(v.id)}<span>${v.label}</span></a>`).join('');
+  const tabs = VIEWS.map((v) => `<a class="tab" href="#/${v.id === 'inicio' ? '' : v.id}" ${r.view === v.id && !r.fonte && !r.autor ? 'aria-current="page"' : ''}><span class="tab-ico">${icon(v.id)}</span><span>${v.label}</span></a>`).join('');
   $('.tabs-bottom').innerHTML = tabs;
   $('.tabs-top').innerHTML = tabs;
 
@@ -369,7 +377,7 @@ function activeFilterPills(r) {
   for (const c of r.pais) pill(state.data.countries[c] || c, { pais: r.pais.filter((x) => x !== c) });
   if (r.idioma) pill(r.idioma === 'pt' ? 'Em português' : 'Em inglês', { idioma: '' });
   if (r.tipo) pill(r.tipo === 'opiniao' ? 'Só opinião e análise' : 'Só notícias', { tipo: '' });
-  if (r.pay) pill('Sem paywall', { pay: '' });
+  if (state.readable) pills.push(`<button class="pill" data-action="readable-off">Só o que consigo ler ${icon('close')}</button>`);
   if (r.q) pill(`“${r.q}”`, { q: '' });
   if (!pills.length) return '';
   if (pills.length > 1) pills.push(`<button class="pill pill-clear" data-action="clear-filters">Limpar tudo</button>`);
@@ -431,7 +439,7 @@ function compareCard(st) {
     const body = items.length
       ? items.map((a) => `<a class="mini" href="${esc(linkOf(a))}" target="_blank" rel="noopener" data-read="${a.id}"><span class="mini-title">${esc(titleOf(a))}</span><span class="mini-src">${esc(state.src[a.s].name)} <span>· ${fmtTime.format(a.d)}</span></span></a>`).join('')
       : `<p class="lane-empty">Nenhum veículo ${k === 'e' ? 'à esquerda' : k === 'd' ? 'à direita' : 'de centro'} noticiou ainda.</p>`;
-    return `<div class="lane-block"><p class="lane-name">${LANES[k]}${byLane[k].length > 2 ? ` <span>+${byLane[k].length - 2}</span>` : ''}</p>${body}</div>`;
+    return `<div class="lane-block"><p class="lane-name">${dot(k)}${LANES[k]}${byLane[k].length > 2 ? ` <span>+${byLane[k].length - 2}</span>` : ''}</p>${body}</div>`;
   };
   return `<article class="compare">
     <div class="compare-head"><h3>${esc(storyTitle(st))}</h3>
@@ -465,7 +473,7 @@ function renderBrasil(main, r) {
     html += `<p class="eyebrow" style="margin-top:18px">Mesma pauta, ângulos diferentes</p><div class="compare-grid">${stories.map(compareCard).join('')}</div>`;
   }
   html += `<div class="lanes intro" role="group" aria-label="Filtrar por campo">
-    <div class="seg">${[['todos', 'Equilibrado'], ['e', 'Esquerda'], ['c', 'Centro'], ['d', 'Direita']].map(([k, l]) => `<button data-lane="${k}" aria-pressed="${r.lane === k}">${l}</button>`).join('')}</div>
+    <div class="seg">${[['todos', 'Equilibrado'], ['e', 'Esquerda'], ['c', 'Centro'], ['d', 'Direita']].map(([k, l]) => `<button data-lane="${k}" aria-pressed="${r.lane === k}">${k === 'todos' ? '' : dot(k)}${l}</button>`).join('')}</div>
     <p class="balance">Últimas 24 h: <b>${dayLanes.e}</b> matérias de veículos à esquerda, <b>${dayLanes.c}</b> de centro e <b>${dayLanes.d}</b> à direita.</p></div>`;
   html += activeFilterPills(r);
 
@@ -478,7 +486,7 @@ function renderBrasil(main, r) {
     main.innerHTML = html;
     mountFeed($('#feed'), lanes[r.lane]);
   } else if (wide) {
-    html += `<div class="cols">${['e', 'c', 'd'].map((k) => `<section class="col"><h2 class="col-head">${LANES[k]} <span style="color:var(--ink-3)">${lanes[k].length}</span></h2><div class="feed" id="col-${k}"></div></section>`).join('')}</div>`;
+    html += `<div class="cols">${['e', 'c', 'd'].map((k) => `<section class="col"><h2 class="col-head lane-${k}">${dot(k)}${LANES[k]} <span style="color:var(--ink-3)">${lanes[k].length}</span></h2><div class="feed" id="col-${k}"></div></section>`).join('')}</div>`;
     main.innerHTML = html;
     for (const k of ['e', 'c', 'd']) mountFeed($(`#col-${k}`), lanes[k], { lanesTag: true });
   } else {
@@ -514,7 +522,7 @@ function contextFonte(r) {
         <dt>Linha editorial</dt><dd>${bucketLabel(s.bias)}</dd>
         <dt>Rigor de apuração</dt><dd>${esc(s.rigor[0].toUpperCase() + s.rigor.slice(1))}</dd>
         <dt>Dono</dt><dd>${esc(s.owner)}</dd>
-        <dt>Acesso</dt><dd>${s.paywall ? 'Exige assinatura para ler tudo' : 'Gratuito'}</dd>
+        <dt>Acesso</dt><dd>${s.paywall ? `Exige assinatura <button class="chip chip-sm" data-sub="${s.id}" aria-pressed="${state.subs.has(s.id)}">${state.subs.has(s.id) ? 'Você assina' : 'Eu assino'}</button>` : 'Gratuito'}</dd>
         <dt>No Mirante</dt><dd>${plural(total, 'matéria', 'matérias')}${down ? ' · <span class="src-down">feed fora do ar na última coleta</span>' : ''}</dd>
       </dl>
       <p class="note">${esc(s.note)}</p>
@@ -543,6 +551,18 @@ function renderScoped(main, r) {
   if (list.length) mountFeed($('#feed'), list);
 }
 
+// Assinaturas: os veículos pagos que o leitor consegue abrir. Fica salvo neste aparelho.
+function subscriptionsBox(where) {
+  const paid = state.data.sources.filter((s) => s.paywall).sort((a, b) => a.short.localeCompare(b.short));
+  const n = state.subs.size;
+  return `<section class="subs${where === 'fontes' ? ' subs-card' : ''}" aria-labelledby="subs-${where}">
+    <h3 id="subs-${where}" class="${where === 'fontes' ? 'group-title' : ''}">O que você consegue ler</h3>
+    <label class="switch"><span>Só gratuitos e minhas assinaturas</span><input type="checkbox" data-action="toggle-readable" ${state.readable ? 'checked' : ''}></label>
+    <p class="fhint">Toque nos jornais pagos que você assina${n ? ` (${n} marcado${n > 1 ? 's' : ''})` : ''}:</p>
+    <div class="fchips">${paid.map((s) => `<button class="chip" data-sub="${s.id}" aria-pressed="${state.subs.has(s.id)}">${esc(s.short)}</button>`).join('')}</div>
+  </section>`;
+}
+
 function renderFontes(main) {
   const all = state.data.sources;
   const counts = {};
@@ -553,7 +573,7 @@ function renderFontes(main) {
       const down = state.data.health?.[s.id]?.ok === 0;
       return `<li class="src-item"><button class="src-row" data-fonte="${s.id}">
         <span class="src-text"><span class="src-name">${esc(s.name)}</span>
-        <span class="src-sub">${bucketLabel(s.bias)} · rigor ${esc(s.rigor)}${s.paywall ? ` · ${icon('lock', 'lock')}` : ''} · ${down ? '<span class="src-down">fora do ar</span>' : `${counts[s.id] || 0} hoje`}</span></span>
+        <span class="src-sub"><span class="lean-label lane-${laneOf(s.bias)}">${bucketLabel(s.bias)}</span> · rigor ${esc(s.rigor)}${s.paywall ? (state.subs.has(s.id) ? ' · <span class="subbed">assinante</span>' : ` · ${icon('lock', 'lock')}`) : ''} · ${down ? '<span class="src-down">fora do ar</span>' : `${counts[s.id] || 0} hoje`}</span></span>
         <span class="src-meter">${ruler(s.bias, { w: 120, h: 16 })}</span>
         ${icon('chevron', 'chev')}
       </button></li>`;
@@ -561,6 +581,7 @@ function renderFontes(main) {
   main.innerHTML = `
     <div class="section-head"><p class="eyebrow">${all.length} veículos</p><h1 class="section-title">Fontes</h1>
     <p class="section-sub">Escolhidas por rigor de apuração, com linhas editoriais diferentes de propósito. Toque num veículo para ver o perfil e só as matérias dele.</p></div>
+    ${subscriptionsBox('fontes')}
     ${group('Brasil', all.filter((s) => s.country === 'BR'))}
     ${group('Internacional', all.filter((s) => s.country !== 'BR'))}
     <h2 class="group-title" style="margin-top:32px">Como classificamos</h2>
@@ -644,13 +665,14 @@ function filtersBody() {
   const temas = ['ultima-hora', ...state.data.topics.map((t) => t.id)];
   const countries = [...new Set(state.data.sources.map((s) => s.country))];
   return `
+    <div class="fgroup">${subscriptionsBox('filtros')}</div>
     <div class="fgroup"><h3>Linha editorial do veículo</h3><div class="fchips">${BUCKETS.map((b) => fchip('lado', b.id, b.label, r.lado.includes(b.id))).join('')}</div></div>
     <div class="fgroup"><h3>Temas</h3><div class="fchips">${temas.map((t) => fchip('tema', t, temaLabel(t), r.tema.includes(t))).join('')}</div></div>
     <div class="fgroup"><h3>Região da notícia</h3><div class="fchips">${state.data.regions.map((g) => fchip('tema', 'r:' + g.id, g.label, r.tema.includes('r:' + g.id))).join('')}</div></div>
     <div class="fgroup"><h3>País do veículo</h3><div class="fchips">${countries.map((c) => fchip('pais', c, state.data.countries[c] || c, r.pais.includes(c))).join('')}</div></div>
     <div class="fgroup"><h3>Idioma</h3><div class="fchips">${fchip('idioma', 'pt', 'Português', r.idioma === 'pt')}${fchip('idioma', 'en', 'Inglês', r.idioma === 'en')}</div></div>
     <div class="fgroup"><h3>Tipo de texto</h3><div class="fchips">${fchip('tipo', 'noticia', 'Só notícias', r.tipo === 'noticia')}${fchip('tipo', 'opiniao', 'Só opinião e análise', r.tipo === 'opiniao')}</div></div>
-    <div class="fgroup"><label class="switch"><span>Esconder veículos com paywall</span><input type="checkbox" data-action="toggle-pay" ${r.pay === '0' ? 'checked' : ''}></label></div>`;
+`;
 }
 function filtersFoot() {
   const n = state.route.view === 'fontes' ? select({ ...state.route, view: 'inicio' }).length : select(state.route).length;
@@ -677,7 +699,7 @@ function openStory(id) {
   for (const a of members) byLane[laneOf(biasOf(a))].push(a);
   const body = `<p class="section-sub" style="margin:0 0 6px">${plural(members.length, 'veículo noticiou', 'veículos noticiaram')} este assunto. Compare os títulos: o enquadramento costuma dizer mais que o fato.</p>
     <p class="balance" style="margin:0 0 4px">${spread(st.lanes)} ${spreadText(st.lanes)}</p>
-    ${['e', 'c', 'd'].map((k) => `<h3 class="lane-tag" style="margin:18px 0 0">${LANES[k]} · ${byLane[k].length}</h3>
+    ${['e', 'c', 'd'].map((k) => `<h3 class="lane-tag" style="margin:18px 0 0">${dot(k)}${LANES[k]} · ${byLane[k].length}</h3>
       ${byLane[k].length ? `<div class="story-list">${byLane[k].map(card).join('')}</div>` : `<p class="lane-empty" style="margin:8px 0 0">Nenhum veículo deste campo noticiou até agora. Ausência também é escolha editorial.</p>`}`).join('')}`;
   const title = storyTitle(st);
   openSheet(title.length > 60 ? 'Mesma pauta' : title, body);
@@ -690,6 +712,7 @@ function openHelp() {
     <h3 class="lane-tag" style="margin:4px 0 8px">A régua</h3>
     <div class="help-ruler">${ruler(-0.45)}<span>piauí · Centro-esquerda</span></div>
     <p>Fica logo abaixo do título e mostra a <strong>linha editorial do veículo</strong>, da esquerda para a direita. A marca central é o centro. Ela não julga cada matéria: veículo de esquerda também faz reportagem factual, e o contrário vale para a direita.</p>
+    <p>As cores seguem o campo: <span class="lean-label lane-e">roxo à esquerda</span>, <span class="lean-label lane-c">cinza no centro</span> e <span class="lean-label lane-d">laranja à direita</span>. A barra cresce do centro até a agulha: quanto mais longa, mais distante do centro. Não usamos vermelho e azul porque significam coisas opostas no Brasil e nos EUA.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Navegar</h3>
     <p><strong>Toque no título</strong> para abrir a matéria no site do veículo. <strong>Toque no nome do jornal</strong> para ver o perfil (dono, linha editorial, rigor) e só as matérias dele. <strong>Toque no autor</strong> para ver tudo o que ele publicou.</p>
     <p>Os <strong>temas</strong> logo abaixo do topo filtram a seção com um toque. O botão de <strong>filtros</strong> combina linha editorial, tema, região, país, idioma e tipo de texto.</p>
@@ -700,8 +723,10 @@ function openHelp() {
     <p>Reuters e AP não têm feed público: os títulos chegam pelo Google Notícias, sem autor. The Economist não assina textos por política própria.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Atualização</h3>
     <p>As fontes são lidas a cada 15 minutos. Última coleta: ${esc(updated)}. Quando chegam matérias novas, um aviso aparece no topo.</p>
+    <h3 class="lane-tag" style="margin:20px 0 8px">Minhas assinaturas</h3>
+    <p>Em <strong>Filtros</strong> (ou na aba Fontes), toque nos jornais pagos que você assina e ligue <strong>Só gratuitos e minhas assinaturas</strong>: o app passa a mostrar só o que você consegue abrir, e o cadeado some dos jornais que você assina. A escolha fica salva neste aparelho; no computador e no celular ela é feita separadamente.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Tradução</h3>
-    <p>O botão <strong>文A</strong> no topo mostra as matérias em inglês em português: título e resumo traduzidos automaticamente (marcados com "Traduzido do inglês") e a matéria abre pelo Google Tradutor. Toque de novo para voltar ao original. Sites com paywall podem não abrir traduzidos; no iPhone, o Safari também traduz pelo botão <strong>aA</strong> da barra de endereço.</p>
+    <p>O botão <strong>文A</strong> no topo mostra as matérias em inglês em português: título e resumo traduzidos automaticamente (marcados com "Traduzido") e a matéria abre pelo Google Tradutor. Toque de novo para voltar ao original. Sites com paywall podem não abrir traduzidos; no iPhone, o Safari também traduz pelo botão <strong>aA</strong> da barra de endereço.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Colocar na tela do celular</h3>
     <p><strong>iPhone (Safari):</strong> botão Compartilhar → Adicionar à Tela de Início.<br><strong>Android (Chrome):</strong> menu ⋮ → Instalar app ou Adicionar à tela inicial.</p>
   </div>`;
@@ -726,6 +751,14 @@ document.addEventListener('click', (ev) => {
   if (t.dataset.fonte) { closeSheet(); return go({ ...EMPTY, view: 'inicio', fonte: t.dataset.fonte }); }
   if (t.dataset.autor) { closeSheet(); return go({ ...EMPTY, view: 'inicio', autor: t.dataset.autor }); }
   if (t.dataset.story) return openStory(t.dataset.story);
+  if (t.dataset.sub) {
+    const id = t.dataset.sub, name = state.src[id].short;
+    if (state.subs.has(id)) state.subs.delete(id); else state.subs.add(id);
+    store.set('subs', [...state.subs]);
+    toast(state.subs.has(id) ? `${name} marcado como assinatura` : `${name} removido das assinaturas`);
+    render();
+    return refreshFilters();
+  }
   if (t.dataset.chip != null) {
     const c = t.dataset.chip;
     return go({ tema: c ? (state.route.tema.length === 1 && state.route.tema[0] === c ? [] : [c]) : [] }, { replace: true });
@@ -749,8 +782,12 @@ document.addEventListener('click', (ev) => {
       toast(state.translate ? 'Matérias em inglês agora aparecem em português' : 'Mostrando os textos no idioma original');
       return render();
     case 'close-sheet': return closeSheet();
+    case 'readable-off':
+      setReadable(false);
+      return;
     case 'clear-filters':
-      go({ tema: [], lado: [], pais: [], idioma: '', tipo: '', pay: '', q: '' }, { replace: true });
+      if (state.readable) setReadable(false, { quiet: true });
+      go({ tema: [], lado: [], pais: [], idioma: '', tipo: '', q: '' }, { replace: true });
       $('#q').value = '';
       return refreshFilters();
     case 'dismiss':
@@ -779,7 +816,7 @@ document.addEventListener('click', (ev) => {
 });
 
 document.addEventListener('change', (ev) => {
-  if (ev.target.dataset.action === 'toggle-pay') { go({ pay: ev.target.checked ? '0' : '' }, { replace: true }); refreshFilters(); }
+  if (ev.target.dataset.action === 'toggle-readable') setReadable(ev.target.checked);
 });
 
 let searchTimer;
@@ -805,6 +842,18 @@ window.addEventListener('online', render);
 window.addEventListener('offline', render);
 let lastWide = matchMedia('(min-width: 960px)').matches;
 matchMedia('(min-width: 960px)').addEventListener('change', (e) => { if (e.matches !== lastWide) { lastWide = e.matches; render(); } });
+
+function setReadable(on, { quiet = false } = {}) {
+  state.readable = on;
+  store.set('readable', on);
+  if (!quiet) {
+    toast(on
+      ? (state.subs.size ? 'Mostrando só gratuitos e suas assinaturas' : 'Mostrando só veículos gratuitos. Marque suas assinaturas para incluí-las')
+      : 'Mostrando todos os veículos');
+  }
+  render();
+  refreshFilters();
+}
 
 function syncTranslateButton() {
   const b = $('[data-action="translate"]');
