@@ -236,6 +236,9 @@ svg { display: block; }
 .tab[aria-current="page"] { color: var(--ink); font-weight: 700; }
 .tab[aria-current="page"] .tab-ico { background: var(--ink); color: var(--paper); }
 .tab[aria-current="page"] svg { stroke-width: 2; }
+/* bandeira: o losango é mais largo que alto, então ganha tamanho para ter o mesmo peso dos vizinhos */
+.tab .ico-brasil { width: 28px; height: 28px; stroke-width: 1.4; }
+.tab[aria-current="page"] .ico-brasil { stroke-width: 1.65; }
 .tabs-top { display: none; }
 
 /* ───────── Conteúdo ───────── */

@@ -12,7 +12,7 @@ const store = {
 
 const ICONS = {
   inicio: '<path d="M4 5h13v14H6a2 2 0 0 1-2-2V5Z"/><path d="M17 9h3v8a2 2 0 0 1-2 2"/><path d="M7.5 9h6M7.5 12.5h6M7.5 16h4"/>',
-  brasil: '<rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M12 7.3 19 12l-7 4.7L5 12Z"/><circle cx="12" cy="12" r="2.7"/><path d="M9.5 11.3c1.7-.5 3.5-.3 5 .7"/>',
+  brasil: '<path d="M12 4 22.5 12 12 20 1.5 12Z"/><circle cx="12" cy="12" r="4.1"/><path d="M8.1 11.1c2.6-.9 5.3-.6 7.8.9"/>',
   mundo: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.6 3.5 5.4 3.5 8.5s-1.1 5.9-3.5 8.5c-2.4-2.6-3.5-5.4-3.5-8.5s1.1-5.9 3.5-8.5Z"/>',
   economia: '<path d="M4 19.5h16"/><path d="m5 15 4-4 3 3 6.5-6.5"/><path d="M14.5 7.5h4v4"/>',
   fontes: '<path d="M4 6.5h16M4 12h16M4 17.5h16"/><path d="M14 4.5v4M9 10v4M16 15.5v4"/>',
@@ -352,7 +352,7 @@ function resetObserver() {
 
 function renderChrome() {
   const r = state.route;
-  const tabs = VIEWS.map((v) => `<a class="tab" href="#/${v.id === 'inicio' ? '' : v.id}" ${r.view === v.id && !r.fonte && !r.autor ? 'aria-current="page"' : ''}><span class="tab-ico">${icon(v.id)}</span><span>${v.label}</span></a>`).join('');
+  const tabs = VIEWS.map((v) => `<a class="tab" href="#/${v.id === 'inicio' ? '' : v.id}" ${r.view === v.id && !r.fonte && !r.autor ? 'aria-current="page"' : ''}><span class="tab-ico">${icon(v.id, v.id === 'brasil' ? 'ico-brasil' : '')}</span><span>${v.label}</span></a>`).join('');
   $('.tabs-bottom').innerHTML = tabs;
   $('.tabs-top').innerHTML = tabs;
 
