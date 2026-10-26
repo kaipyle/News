@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseFeed, parseDate, decodeBody } from '../lib/parse.mjs';
 import { toArticle, canonicalUrl, cleanAuthors, classify } from '../lib/normalize.mjs';
 import { extractMeta } from '../lib/enrich.mjs';
-import { clipSummary, composeSummary, ledeFromHtml, shardOf, SHARDS } from '../lib/summary.mjs';
+import { clipSummary, composeSummary, ledeFromHtml, shardOf, SHARDS, tidySummary } from '../lib/summary.mjs';
 import { clusterStories } from '../lib/cluster.mjs';
 import { SOURCES } from '../config/sources.mjs';
 
@@ -247,4 +247,11 @@ test('resumo: vem do texto completo do feed e da página da matéria', () => {
 test('resumo: arquivo de cada matéria é estável, numerado (sem problema de maiúsculas) e cabe nos 32', () => {
   assert.equal(shardOf('Ab3_x'), 'A'.charCodeAt(0) % SHARDS);
   for (const id of ['-abc', '_abc', 'zzz', '0aa', 'Zaa']) assert.ok(shardOf(id) >= 0 && shardOf(id) < SHARDS);
+});
+
+test('resumo: limpa restos de feed e espaço antes de pontuação', () => {
+  assert.equal(tidySummary('O senador Flávio Bolsonaro [https://www.gazetadopovo.com.br/x/] disse que vai recorrer.'), 'O senador Flávio Bolsonaro disse que vai recorrer.');
+  assert.equal(tidySummary('Em tempos de Donald Trump , guerras e ( VALE3 ) em alta .'), 'Em tempos de Donald Trump, guerras e (VALE3) em alta.');
+  assert.equal(tidySummary('Escândalos mostram o perigo. O post Flávio e as milícias apareceu primeiro em Intercept Brasil.'), 'Escândalos mostram o perigo.');
+  assert.equal(tidySummary("Follow the day's news live Get our breaking news email, free app or daily news podcast Katy Gallagher said"), 'Katy Gallagher said');
 });

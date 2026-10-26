@@ -16,7 +16,7 @@ import { toArticle } from '../lib/normalize.mjs';
 import { enrichArticles } from '../lib/enrich.mjs';
 import { translateArticles } from '../lib/translate.mjs';
 import { clusterStories } from '../lib/cluster.mjs';
-import { writeSummaries } from '../lib/summary.mjs';
+import { writeSummaries, tidySummary } from '../lib/summary.mjs';
 import { fetchText, fetchPage } from '../lib/http.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -63,7 +63,10 @@ export async function build({ report = false } = {}) {
   const prev = await loadPrevious();
   const prevSummaries = (await loadPrevious('resumos.json')) || {};
   const prevById = new Map((prev?.articles || []).map((a) => {
-    const [rs, trs] = prevSummaries[a.id] || [];
+    // resumos antigos passam pela limpeza atual; se o texto mudar, a tradução é refeita
+    const [raw, rawTr] = prevSummaries[a.id] || [];
+    const rs = raw && tidySummary(raw);
+    const trs = rs === raw ? rawTr : undefined;
     return [a.id, { by: [], tp: [], rg: [], x: '', img: '', ...a, ...(rs && { rs }), ...(trs && { trs }) }];
   }));
   log(`estado anterior: ${prevById.size} matérias`);
