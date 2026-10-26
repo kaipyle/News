@@ -59,7 +59,7 @@ export async function build({ report = false } = {}) {
   const now = started;
   const sourcesById = Object.fromEntries(SOURCES.map((s) => [s.id, s]));
   const prev = await loadPrevious();
-  const prevById = new Map((prev?.articles || []).map((a) => [a.id, a]));
+  const prevById = new Map((prev?.articles || []).map((a) => [a.id, { by: [], tp: [], rg: [], x: '', img: '', ...a }]));
   log(`estado anterior: ${prevById.size} matérias`);
 
   // 1. Coleta
@@ -146,7 +146,12 @@ export async function build({ report = false } = {}) {
   stories.sort((x, y) => y.ids.length - x.ids.length || y.d - x.d);
 
   // 5. Grava
-  for (const a of articles) delete a._section;
+  // campos vazios não vão para o JSON (o app trata ausência como vazio)
+  for (const a of articles) {
+    delete a._section;
+    for (const k of ['by', 'tp', 'rg']) if (!a[k]?.length) delete a[k];
+    for (const k of ['x', 'img']) if (!a[k]) delete a[k];
+  }
   const feed = {
     v: 1,
     updatedAt: now,
@@ -173,12 +178,12 @@ export async function build({ report = false } = {}) {
     log('\nfonte            matérias  c/autor  c/imagem  feeds');
     for (const s of SOURCES) {
       const list = articles.filter((a) => a.s === s.id);
-      const pa = list.length ? Math.round((100 * list.filter((a) => a.by.length).length) / list.length) : 0;
+      const pa = list.length ? Math.round((100 * list.filter((a) => a.by?.length).length) / list.length) : 0;
       const pi = list.length ? Math.round((100 * list.filter((a) => a.img).length) / list.length) : 0;
       log(`${s.id.padEnd(16)} ${String(list.length).padStart(8)} ${String(pa + '%').padStart(8)} ${String(pi + '%').padStart(9)}  ${health[s.id].ok}/${health[s.id].feeds}`);
     }
     log('\ntemas:');
-    for (const t of TOPICS) log(`  ${t.id.padEnd(14)} ${articles.filter((a) => a.tp.includes(t.id)).length}`);
+    for (const t of TOPICS) log(`  ${t.id.padEnd(14)} ${articles.filter((a) => a.tp?.includes(t.id)).length}`);
     log(`  opinião        ${articles.filter((a) => a.op).length}`);
     log(`  ao vivo        ${articles.filter((a) => a.live).length}`);
     log('\npautas em comum:');
@@ -188,7 +193,7 @@ export async function build({ report = false } = {}) {
     }
     log('\namostra de autores por fonte:');
     for (const s of SOURCES) {
-      const ex = articles.filter((a) => a.s === s.id && a.by.length).slice(0, 3).map((a) => a.by.join(' + '));
+      const ex = articles.filter((a) => a.s === s.id && a.by?.length).slice(0, 3).map((a) => a.by.join(' + '));
       log(`  ${s.id.padEnd(16)} ${ex.join(' | ')}`);
     }
   }

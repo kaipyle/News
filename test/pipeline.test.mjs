@@ -79,6 +79,8 @@ test('assinaturas', () => {
   assert.deepEqual(cleanAuthors(['AMY MORRIS'], src('bloomberg')), ['Amy Morris']);
   assert.deepEqual(cleanAuthors(['Paulo Pappas'], src('ap')), ['Paulo Pappas']);
   assert.deepEqual(cleanAuthors(['Fulano de Tal, g1 — Brasília'], src('g1')), ['Fulano de Tal']);
+  assert.deepEqual(cleanAuthors(['Tom Phillips in Rio de Janeiro'], src('guardian')), ['Tom Phillips']);
+  assert.deepEqual(cleanAuthors(['Tom Ambrose (now), Martin Belam'], src('guardian')), ['Tom Ambrose', 'Martin Belam']);
 });
 
 test('temas e regiões', () => {

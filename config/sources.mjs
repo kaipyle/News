@@ -274,6 +274,7 @@ export const SOURCES = [
     note: 'Centro-direita, próximo ao Partido Conservador britânico.',
     feeds: [
       { url: 'https://www.telegraph.co.uk/rss.xml', section: 'geral' },
+      { url: 'https://www.telegraph.co.uk/news/rss.xml', section: 'geral' },
       { url: 'https://www.telegraph.co.uk/business/rss.xml', section: 'economia' },
     ],
   },

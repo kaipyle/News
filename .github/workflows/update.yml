@@ -1,0 +1,57 @@
+name: Atualizar notícias
+# Coleta os feeds e publica o app no GitHub Pages.
+# Requer: Settings → Pages → Source: "GitHub Actions".
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *' # a cada 15 min (minutos "quebrados" fogem do pico das :00)
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: write # usado só pelo passo que mantém o agendamento ligado
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - id: pages
+        uses: actions/configure-pages@v5
+      - name: Coletar notícias
+        run: node scripts/build-feed.mjs
+        env:
+          # reaproveita autores, imagens e matérias que já saíram do RSS
+          PREVIOUS_FEED_URL: ${{ steps.pages.outputs.base_url }}/data/feed.json
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deploy
+        uses: actions/deploy-pages@v4
+      - name: Manter o agendamento ativo
+        # Em repositório público, o GitHub desliga agendamentos após 60 dias sem commits.
+        if: github.event_name == 'schedule' && github.event.schedule == '7,22,37,52 * * * *'
+        continue-on-error: true
+        run: |
+          if [ "$(date -u +%H%M)" \< "0015" ]; then
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/update.yml/enable"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
