@@ -675,7 +675,7 @@ function openHelp() {
     <h3 class="lane-tag" style="margin:20px 0 8px">Brasil: os dois lados</h3>
     <p>A aba Brasil mostra a política nacional separada por campo. <strong>Mesma pauta</strong> junta o mesmo fato contado por veículos diferentes; quando um lado não noticia, isso aparece.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Sinais nos cartões</h3>
-    <p><span class="now">Agora</span> publicado há menos de 45 minutos. <span class="now">Ao vivo</span> cobertura em tempo real. <span class="tag">Opinião</span> coluna, editorial ou análise. <span class="pay">${icon('lock')}</span> o veículo cobra assinatura.</p>
+    <p><span class="now">Ao vivo</span> cobertura em tempo real (o tema <strong>Última hora</strong> mostra só as últimas 3 horas). <span class="tag">Opinião</span> coluna, editorial ou análise. <span class="pay">${icon('lock')}</span> o veículo cobra assinatura.</p>
     <p>Reuters e AP não têm feed público: os títulos chegam pelo Google Notícias, sem autor. The Economist não assina textos por política própria.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Atualização</h3>
     <p>As fontes são lidas a cada 15 minutos. Última coleta: ${esc(updated)}. Quando chegam matérias novas, um aviso aparece no topo.</p>
