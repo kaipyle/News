@@ -16,5 +16,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Feeds candidatos
+        if: hashFiles('test/feeds-candidatos.txt') != ''
+        continue-on-error: true
+        run: node scripts/probe-feeds.mjs --file test/feeds-candidatos.txt
       - name: Coleta de verdade (relatório por fonte)
         run: node scripts/build-feed.mjs --report
