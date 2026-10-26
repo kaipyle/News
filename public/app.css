@@ -45,6 +45,7 @@
   --right: #b8590a;
   --right-text: #9a4600;
   --center: #2f3338;
+  --menu-surface: #ffffff;
 
   --serif: 'Piazzolla', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
   --sans: 'Schibsted Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -73,13 +74,14 @@
     --right: #f2a65a;
     --right-text: #f2a65a;
     --center: #d4d6da;
+    --menu-surface: #2b2e33;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --paper: #0e0f11; --raised: #17191c; --ink: #f0f0ee; --ink-2: #c3c6cb; --ink-3: #959aa1;
   --rule: #2c2f34; --rule-strong: #6a6f76; --tint: #212328; --tally: #ff5a47; --visited: #8d9298;
-  --left: #bba2ec; --right: #f2a65a; --right-text: #f2a65a; --center: #d4d6da;
+  --left: #bba2ec; --right: #f2a65a; --right-text: #f2a65a; --center: #d4d6da; --menu-surface: #2b2e33;
   color-scheme: dark;
 }
 
@@ -129,11 +131,62 @@ svg { display: block; }
 .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .icon-btn:active { background: var(--tint); }
 .icon-btn[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
-.badge {
-  position: absolute; top: 5px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px;
-  border-radius: 8px; background: var(--ink); color: var(--paper);
-  font: 650 10px/16px var(--sans); text-align: center;
+/* ───────── Menu: ☰ gira e vira ×, a tela escurece e as ações descem em cascata ───────── */
+.menu-btn { color: var(--ink); }
+.burger { position: relative; display: block; width: 20px; height: 14px; transition: transform .34s cubic-bezier(.2,.8,.2,1); }
+.burger i {
+  position: absolute; left: 0; right: 0; height: 2px; border-radius: 1px; background: currentColor;
+  transition: transform .34s cubic-bezier(.2,.8,.2,1), opacity .18s ease;
 }
+.burger i:nth-child(1) { top: 0; }
+.burger i:nth-child(2) { top: 6px; }
+.burger i:nth-child(3) { top: 12px; }
+.menu-dot { position: absolute; top: 6px; right: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--paper); }
+
+.menu { position: fixed; inset: 0; z-index: 42; }
+.menu-scrim {
+  position: absolute; inset: 0; background: rgb(6 7 9 / .58);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  opacity: 0; transition: opacity .24s ease;
+}
+.menu.is-open .menu-scrim { opacity: 1; }
+.menu-close {
+  position: absolute; top: var(--my); right: var(--mx);
+  background: var(--menu-surface); box-shadow: 0 6px 20px rgb(0 0 0 / .28);
+}
+.menu.is-open .menu-close .burger { transform: rotate(180deg); }
+.menu.is-open .menu-close .burger i:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.menu.is-open .menu-close .burger i:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.menu.is-open .menu-close .burger i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+.menu-items {
+  position: absolute; top: calc(var(--my) + var(--mh) + 12px); right: var(--mx);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+}
+.menu-item {
+  display: flex; align-items: center; gap: 10px; text-align: right;
+  opacity: 0; transform: translateY(-14px) scale(.88); transform-origin: right center;
+  transition: transform .3s cubic-bezier(.2,.9,.25,1.15), opacity .2s ease;
+  transition-delay: calc(var(--i) * 40ms);
+}
+.menu.is-open .menu-item { opacity: 1; transform: none; }
+.menu:not(.is-open) .menu-item { transition-duration: .14s; transition-delay: 0s; }
+.menu-label {
+  display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-radius: 12px;
+  background: var(--menu-surface); color: var(--ink); font: 600 15px/1 var(--sans);
+  box-shadow: 0 6px 18px rgb(0 0 0 / .22);
+}
+.menu-label em {
+  font: 700 10px/1 var(--sans); font-style: normal; letter-spacing: .07em; text-transform: uppercase;
+  padding: 4px 6px; border-radius: 6px; background: var(--ink); color: var(--paper);
+}
+.menu-ico {
+  display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; flex: none;
+  background: var(--menu-surface); color: var(--ink); box-shadow: 0 6px 18px rgb(0 0 0 / .22);
+}
+.menu-ico svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.menu-item.is-on .menu-ico { background: var(--ink); color: var(--paper); }
+.menu-item:focus-visible { outline: none; }
+.menu-item:focus-visible .menu-label { outline: 2px solid var(--menu-surface); outline-offset: 3px; }
 .text-btn { font-weight: 550; font-size: 14px; padding: 8px 4px; color: var(--ink-2); }
 
 .search-row {

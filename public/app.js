@@ -21,6 +21,11 @@ const ICONS = {
   close: '<path d="M7 7l10 10M17 7 7 17"/>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   out: '<path d="M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/>',
+  filters: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+  paywall: '<rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8.2 10.5V7.8a3.8 3.8 0 0 1 7.6 0v2.7"/><path d="M12 14.4v2.4"/>',
+  translate: '<path d="M3.5 5.5h9M8 3.5v2M10.5 5.5c-.6 3.6-3 6.4-6.5 8M5.5 8.5c1.2 2.4 3.2 4.2 5.5 5"/><path d="m12.5 20.5 4-9 4 9M13.8 17.6h5.4"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4"/><circle cx="12" cy="16.9" r=".6" fill="currentColor"/>',
 };
 const icon = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
 
@@ -359,10 +364,7 @@ function renderChrome() {
     const on = row.querySelector('[aria-pressed="true"]');
     if (on && on.dataset.chip) on.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   }
-  const n = filterCount(r);
-  const badge = $('[data-action="filters"] .badge');
-  badge.hidden = !n;
-  badge.textContent = n;
+  syncMenuState();
   const q = $('#q');
   if (document.activeElement !== q) q.value = r.q;
   if (r.q) $('.search-row').hidden = false;
@@ -387,7 +389,7 @@ function emptyState(r) {
   const any = filterCount(r) || r.q;
   return `<div class="empty"><h2>Nenhuma matéria aqui</h2>
     <p>${any ? 'Os filtros escolhidos não deixaram nenhuma matéria das últimas 72 horas.' : 'Ainda não há matérias nesta seção. A próxima coleta acontece em alguns minutos.'}</p>
-    ${state.readable ? `<p>Você está vendo só jornais gratuitos e os que assina (cadeado no topo ligado).</p><button class="btn btn-ghost" data-action="paywall">Mostrar também os pagos</button> ` : ''}
+    ${state.readable ? `<p>Você está vendo só jornais gratuitos e os que assina ("Ocultar pagos" ligado no menu).</p><button class="btn btn-ghost" data-action="paywall">Mostrar também os pagos</button> ` : ''}
     ${any ? `<button class="btn" data-action="clear-filters">Limpar filtros</button>` : ''}
     ${r.q && r.view !== 'inicio' ? ` <a class="btn btn-ghost" href="${buildHash({ ...r, view: 'inicio' })}">Buscar em todas as seções</a>` : ''}</div>`;
 }
@@ -684,8 +686,8 @@ function openFilters() {
 }
 function openSubs({ first = false } = {}) {
   const intro = first
-    ? 'Marque os jornais pagos que você assina. Eles continuam aparecendo; os outros pagos ficam ocultos até você tocar no cadeado de novo.'
-    : 'Os jornais marcados continuam aparecendo com o cadeado ligado; os demais pagos ficam ocultos.';
+    ? 'Marque os jornais pagos que você assina. Eles continuam aparecendo; os outros pagos ficam ocultos até você desligar "Ocultar pagos" no menu.'
+    : 'Com "Ocultar pagos" ligado, os jornais marcados continuam aparecendo e os demais pagos ficam ocultos.';
   openSheet('Suas assinaturas', `<p class="section-sub" style="margin:0 0 10px">${intro}</p>${subscriptionsBox('sheet')}`, '<button class="btn" data-action="close-sheet">Pronto</button>');
   $('#sheet').dataset.kind = 'subs';
 }
@@ -727,7 +729,7 @@ function openHelp() {
     <p>As cores seguem o campo: <span class="lean-label lane-e">roxo à esquerda</span>, <span class="lean-label lane-c">cinza no centro</span> e <span class="lean-label lane-d">laranja à direita</span>. A barra cresce do centro até a agulha: quanto mais longa, mais distante do centro. Não usamos vermelho e azul porque significam coisas opostas no Brasil e nos EUA.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Navegar</h3>
     <p><strong>Toque no título</strong> para abrir a matéria no site do veículo. <strong>Toque no nome do jornal</strong> para ver o perfil (dono, linha editorial, rigor) e só as matérias dele. <strong>Toque no autor</strong> para ver tudo o que ele publicou.</p>
-    <p>Os <strong>temas</strong> logo abaixo do topo filtram a seção com um toque. O botão de <strong>filtros</strong> combina linha editorial, tema, região, país, idioma e tipo de texto.</p>
+    <p>Os <strong>temas</strong> logo abaixo do topo filtram a seção com um toque. <strong>Filtros</strong>, no menu, combina linha editorial, tema, região, país, idioma e tipo de texto.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Brasil: os dois lados</h3>
     <p>A aba Brasil mostra a política nacional separada por campo. <strong>Mesma pauta</strong> junta o mesmo fato contado por veículos diferentes; quando um lado não noticia, isso aparece.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Sinais nos cartões</h3>
@@ -736,9 +738,9 @@ function openHelp() {
     <h3 class="lane-tag" style="margin:20px 0 8px">Atualização</h3>
     <p>As fontes são lidas a cada 15 minutos. Última coleta: ${esc(updated)}. Quando chegam matérias novas, um aviso aparece no topo.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Minhas assinaturas</h3>
-    <p>Toque no <strong>cadeado</strong> no topo para esconder os jornais pagos que você não assina; toque de novo para mostrar todos. Ele fica ligado até você desligar, em qualquer aba ou tema. Para dizer quais jornais você assina, use o botão <strong>Assinaturas</strong> do aviso, a seção no topo dos <strong>Filtros</strong> ou a aba <strong>Fontes</strong>. Fica salvo neste aparelho: no computador e no celular a escolha é feita separadamente.</p>
+    <p>No <strong>menu</strong> (botão ☰ no topo), toque em <strong>Ocultar pagos</strong> para esconder os jornais pagos que você não assina; toque de novo para mostrar todos. Ele fica ligado até você desligar, em qualquer aba ou tema. Para dizer quais jornais você assina, use o botão <strong>Assinaturas</strong> do aviso, a seção no topo dos <strong>Filtros</strong> ou a aba <strong>Fontes</strong>. Fica salvo neste aparelho: no computador e no celular a escolha é feita separadamente.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Tradução</h3>
-    <p>O botão <strong>文A</strong> no topo mostra as matérias em inglês em português: título e resumo traduzidos automaticamente (marcados com "Traduzido") e a matéria abre pelo Google Tradutor. Toque de novo para voltar ao original. Sites com paywall podem não abrir traduzidos; no iPhone, o Safari também traduz pelo botão <strong>aA</strong> da barra de endereço.</p>
+    <p><strong>Traduzir para o português</strong>, no menu, mostra as matérias em inglês em português: título e resumo traduzidos automaticamente (marcados com "Traduzido") e a matéria abre pelo Google Tradutor. Toque de novo para voltar ao original. Sites com paywall podem não abrir traduzidos; no iPhone, o Safari também traduz pelo botão <strong>aA</strong> da barra de endereço.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Colocar na tela do celular</h3>
     <p><strong>iPhone (Safari):</strong> botão Compartilhar → Adicionar à Tela de Início.<br><strong>Android (Chrome):</strong> menu ⋮ → Instalar app ou Adicionar à tela inicial.</p>
   </div>`;
@@ -751,7 +753,7 @@ function openHelp() {
 function toggleIn(list, v) { return list.includes(v) ? list.filter((x) => x !== v) : [...list, v]; }
 
 document.addEventListener('click', (ev) => {
-  const t = ev.target.closest('button, a');
+  const t = ev.target.closest('button, a, [data-action]');
   if (!t) return;
 
   if (t.dataset.read) {
@@ -785,13 +787,15 @@ document.addEventListener('click', (ev) => {
     return refreshFilters();
   }
 
+  if (t.closest('.menu-items')) closeMenu();
+
   switch (t.dataset.action) {
     case 'filters': return openFilters();
     case 'help': return openHelp();
     case 'translate':
       state.translate = !state.translate;
       store.set('translate', state.translate);
-      syncTranslateButton();
+      syncMenuState();
       toast(state.translate ? 'Matérias em inglês agora aparecem em português' : 'Mostrando os textos no idioma original');
       return render();
     case 'close-sheet': return closeSheet();
@@ -815,17 +819,18 @@ document.addEventListener('click', (ev) => {
     case 'back':
       if (state.stack.length > 1) return history.back();
       return go({ ...EMPTY, view: 'inicio' }, { replace: true });
-    case 'search': {
-      const row = $('.search-row');
-      row.hidden = !row.hidden;
-      t.setAttribute('aria-expanded', String(!row.hidden));
-      if (!row.hidden) $('#q').focus();
+    case 'search':
+      $('.search-row').hidden = false;
+      $('#q').focus();
       requestAnimationFrame(measureHead);
       return;
-    }
+    case 'menu': return openMenu();
+    case 'menu-close':
+      closeMenu();
+      $('.top .menu-btn').focus({ preventScroll: true });
+      return;
     case 'search-close':
       $('.search-row').hidden = true;
-      $('[data-action="search"]').setAttribute('aria-expanded', 'false');
       if (state.route.q) go({ q: '' }, { replace: true });
       requestAnimationFrame(measureHead);
       return;
@@ -845,7 +850,7 @@ $('#q').addEventListener('input', (ev) => {
 $('#q').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') ev.target.blur(); });
 
 document.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape') closeSheet();
+  if (ev.key === 'Escape') { closeMenu(); closeSheet(); }
   if (ev.key === '/' && document.activeElement?.tagName !== 'INPUT') {
     ev.preventDefault();
     $('.search-row').hidden = false;
@@ -865,7 +870,7 @@ matchMedia('(min-width: 960px)').addEventListener('change', (e) => { if (e.match
 function setReadable(on, { quiet = false } = {}) {
   state.readable = on;
   store.set('readable', on);
-  syncPaywallButton();
+  syncMenuState();
   if (!quiet) {
     toast(on
       ? (state.subs.size ? 'Pagos que você não assina estão ocultos' : 'Só jornais gratuitos. Marque suas assinaturas para incluí-las')
@@ -875,19 +880,54 @@ function setReadable(on, { quiet = false } = {}) {
   refreshFilters();
 }
 
-function syncPaywallButton() {
-  const b = $('[data-action="paywall"]');
-  b.setAttribute('aria-pressed', String(state.readable));
-  const label = state.readable ? 'Pagos que você não assina estão ocultos. Toque para mostrar todos' : 'Ocultar jornais pagos que você não assina';
-  b.setAttribute('aria-label', label);
-  b.title = label;
+// ───────────────────────── Menu (no lugar dos botões do topo) ─────────────────────────
+
+const menuItems = () => [
+  { action: 'search', label: 'Buscar', icon: 'search' },
+  { action: 'filters', label: 'Filtros', icon: 'filters', badge: filterCount(state.route) },
+  { action: 'paywall', label: 'Ocultar pagos', icon: 'paywall', on: state.readable },
+  { action: 'translate', label: 'Traduzir para o português', icon: 'translate', on: state.translate },
+  { action: 'help', label: 'Como funciona', icon: 'help' },
+];
+
+// O ponto no botão avisa que algo está mudando o que aparece (filtro, pagos ocultos, tradução).
+function syncMenuState() {
+  const active = [filterCount(state.route) && 'filtros', state.readable && 'pagos ocultos', state.translate && 'tradução ligada'].filter(Boolean);
+  $('.top .menu-dot').hidden = !active.length;
+  $('.top .menu-btn').setAttribute('aria-label', `Abrir menu${active.length ? ` (${active.join(', ')})` : ''}: buscar, filtros, ocultar pagos, traduzir e ajuda`);
 }
 
-function syncTranslateButton() {
-  const b = $('[data-action="translate"]');
-  b.setAttribute('aria-pressed', String(state.translate));
-  b.setAttribute('aria-label', state.translate ? 'Tradução ligada: mostrar textos originais' : 'Traduzir matérias em inglês para o português');
-  b.title = state.translate ? 'Tradução ligada' : 'Traduzir para o português';
+let menuTimer;
+function openMenu() {
+  const menu = $('#menu');
+  const trigger = $('.top .menu-btn');
+  const r = trigger.getBoundingClientRect();
+  // o "×" do menu nasce exatamente sobre o botão; as opções descem a partir dele
+  menu.style.setProperty('--mx', `${document.documentElement.clientWidth - r.right}px`);
+  menu.style.setProperty('--my', `${r.top}px`);
+  menu.style.setProperty('--mh', `${r.height}px`);
+  $('.menu-items', menu).innerHTML = menuItems().map((it, i) => {
+    const toggle = it.on != null;
+    const tags = (it.on ? '<em>ligado</em>' : '') + (it.badge ? `<em>${it.badge}</em>` : '');
+    return `<button class="menu-item${it.on ? ' is-on' : ''}" role="${toggle ? 'menuitemcheckbox' : 'menuitem'}"${toggle ? ` aria-checked="${it.on}"` : ''} data-action="${it.action}" style="--i:${i}">
+      <span class="menu-label">${esc(it.label)}${tags}</span><span class="menu-ico">${icon(it.icon)}</span></button>`;
+  }).join('');
+  clearTimeout(menuTimer);
+  menu.hidden = false;
+  trigger.setAttribute('aria-expanded', 'true');
+  document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => requestAnimationFrame(() => menu.classList.add('is-open')));
+  $('.menu-item', menu).focus({ preventScroll: true });
+}
+
+function closeMenu() {
+  const menu = $('#menu');
+  if (menu.hidden) return;
+  menu.classList.remove('is-open');
+  $('.top .menu-btn').setAttribute('aria-expanded', 'false');
+  document.body.style.overflow = '';
+  clearTimeout(menuTimer);
+  menuTimer = setTimeout(() => { menu.hidden = true; }, 230);
 }
 
 let toastTimer;
@@ -971,7 +1011,5 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 }
 
 state.route = parseRoute();
-syncTranslateButton();
-syncPaywallButton();
 renderChrome();
 load();
