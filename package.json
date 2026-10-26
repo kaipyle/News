@@ -1,0 +1,17 @@
+{
+  "name": "mirante",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hub pessoal de notícias com fontes de qualidade e régua de linha editorial.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.mjs",
+    "build": "node scripts/build-feed.mjs",
+    "report": "node scripts/build-feed.mjs --report",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.11.2"
+  }
+}
