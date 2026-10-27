@@ -221,7 +221,7 @@ svg { display: block; }
 .tabs-bottom {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
   height: calc(var(--tab-h) + var(--safe-b)); padding-bottom: var(--safe-b);
-  display: grid; grid-template-columns: repeat(5, 1fr);
+  display: grid; grid-template-columns: repeat(6, 1fr);
   background: color-mix(in srgb, var(--paper) 94%, transparent);
   backdrop-filter: saturate(1.4) blur(12px);
   -webkit-backdrop-filter: saturate(1.4) blur(12px);
@@ -231,7 +231,9 @@ svg { display: block; }
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   text-decoration: none; color: var(--ink-3); font: 550 11px/1 var(--sans); letter-spacing: .01em;
 }
-.tab-ico { display: grid; place-items: center; width: 52px; height: 28px; border-radius: 14px; }
+.tab-ico { display: grid; place-items: center; width: 48px; height: 28px; border-radius: 14px; }
+/* seis abas: em celular estreito o rótulo encolhe um pouco para "Tecnologia" caber */
+@media (max-width: 380px) { .tab { font-size: 10px; letter-spacing: 0; } .tab-ico { width: 42px; } }
 .tab svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .tab[aria-current="page"] { color: var(--ink); font-weight: 700; }
 .tab[aria-current="page"] .tab-ico { background: var(--ink); color: var(--paper); }
@@ -572,7 +574,7 @@ main { max-width: var(--col); margin: 0 auto; padding: 0 var(--gutter) 40px; out
   body.is-wide .top-row, body.is-wide .chips-row, body.is-wide .search-row { max-width: 1240px; }
   .tabs-top { display: flex; gap: 0; margin: 0 auto 0 20px; height: 100%; }
   .tabs-top .tab { flex-direction: row; padding: 0 11px; font-size: 14.5px; font-weight: 550; letter-spacing: 0; border-bottom: 2px solid transparent; }
-  .tabs-top .tab svg { display: none; }
+  .tabs-top .tab svg, .tabs-top .tab-ico { display: none; }
   .tabs-top .tab[aria-current="page"] { border-bottom-color: var(--ink); }
   .brand { margin-right: 0; }
   main.wide { max-width: 1240px; }

@@ -4,8 +4,11 @@
 //   node scripts/build-feed.mjs            coleta e grava
 //   node scripts/build-feed.mjs --report   idem, com relatório detalhado por fonte
 //
-// Estado anterior: reaproveita public/data/feed.json (e resumos.json) local ou, se não existir,
-// PREVIOUS_FEED_URL (no GitHub Actions, o feed já publicado no site).
+// Estado anterior: reaproveita public/data/feed.json (mais feed-<aba>.json e resumos.json) local ou,
+// se não existir, PREVIOUS_FEED_URL (no GitHub Actions, o feed já publicado no site).
+//
+// Arquivos gerados: feed.json (notícias gerais, o que o app abre primeiro), feed-tecnologia.json e
+// feed-cinema.json (matérias só desses temas, baixadas quando o leitor abre a aba) e data/resumos/.
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +26,19 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(ROOT, 'public', 'data');
 const DEFAULT_MAX_AGE_H = 72;
 const MAX_PER_SOURCE = 300;
+const DESKS = [...new Set(TOPICS.map((t) => t.desk).filter(Boolean))];
+const DESK_OF = Object.fromEntries(TOPICS.filter((t) => t.desk).map((t) => [t.id, t.desk]));
+
+// Matéria só de temas com aba própria vai para o arquivo da aba; com qualquer tema de notícia geral
+// (política, economia, guerra...) fica no feed principal.
+export function deskOf(a, source) {
+  const tp = a.tp || [];
+  if (tp.some((t) => !DESK_OF[t])) return '';
+  const desks = new Set(tp.map((t) => DESK_OF[t]));
+  if (!desks.size) return '';
+  if (source?.desk && desks.has(source.desk)) return source.desk;
+  return [...desks][0];
+}
 
 const log = (...a) => console.log(...a);
 
@@ -61,6 +77,10 @@ export async function build({ report = false } = {}) {
   const now = started;
   const sourcesById = Object.fromEntries(SOURCES.map((s) => [s.id, s]));
   const prev = await loadPrevious();
+  for (const d of DESKS) {
+    const extra = await loadPrevious(`feed-${d}.json`);
+    if (prev && extra?.articles) prev.articles.push(...extra.articles);
+  }
   const prevSummaries = (await loadPrevious('resumos.json')) || {};
   const prevById = new Map((prev?.articles || []).map((a) => {
     // resumos antigos passam pela limpeza atual; se o texto mudar, a tradução é refeita
@@ -138,7 +158,7 @@ export async function build({ report = false } = {}) {
 
   let articles = [...byId.values()].sort((x, y) => y.d - x.d);
   const perSource = {};
-  articles = articles.filter((a) => (perSource[a.s] = (perSource[a.s] || 0) + 1) <= MAX_PER_SOURCE);
+  articles = articles.filter((a) => (perSource[a.s] = (perSource[a.s] || 0) + 1) <= (sourcesById[a.s].maxItems || MAX_PER_SOURCE));
 
   // 3. Autor/imagem pela página da matéria (só as novas, com orçamento por rodada)
   if (process.env.SKIP_ENRICH !== '1') {
@@ -157,7 +177,9 @@ export async function build({ report = false } = {}) {
     for (const st of clusterStories(group, lane)) {
       const members = st.ids.map((id) => byId.get(id));
       const br = members.filter((a) => a.tp.includes('politica-br')).length >= members.length / 2;
-      stories.push({ ...st, lang, br: br ? 1 : 0 });
+      // pauta de tecnologia ou cinema aparece na aba dela, não no "Mais cobertas" do Início
+      const desk = DESKS.find((d) => members.filter((a) => deskOf(a, sourcesById[a.s]) === d).length > members.length / 2);
+      stories.push({ ...st, lang, br: br ? 1 : 0, ...(desk && { dk: desk }) });
     }
   }
   stories.sort((x, y) => y.ids.length - x.ids.length || y.d - x.d);
@@ -176,27 +198,39 @@ export async function build({ report = false } = {}) {
     for (const k of ['by', 'tp', 'rg']) if (!a[k]?.length) delete a[k];
     for (const k of ['x', 'img', 'tt', 'tx']) if (!a[k]) delete a[k];
   }
+  const byDesk = Object.fromEntries(['', ...DESKS].map((d) => [d, []]));
+  for (const a of articles) byDesk[deskOf(a, sourcesById[a.s])].push(a);
   const feed = {
     v: 1,
     updatedAt: now,
-    sources: SOURCES.map(({ feeds, titleStrip, ...s }) => ({ ...s, feeds: feeds.length })),
+    sources: SOURCES.map(({ feeds, titleStrip, maxItems, ...s }) => ({ ...s, feeds: feeds.length })),
     countries: COUNTRIES,
-    topics: TOPICS.map(({ id, label, short }) => ({ id, label, short })),
+    topics: TOPICS.map(({ id, label, short, desk, parent }) => ({ id, label, short, ...(desk && { desk }), ...(parent && { parent }) })),
     regions: REGIONS.map(({ id, label }) => ({ id, label })),
+    desks: DESKS,
     health: Object.fromEntries(Object.entries(health).map(([id, h]) => [id, { ok: h.ok, feeds: h.feeds, items: h.items }])),
-    stories: stories.slice(0, 40),
-    articles,
+    // as pautas de cada aba ficam todas; as gerais, as 40 maiores
+    stories: [...stories.filter((st) => !st.dk).slice(0, 40), ...DESKS.flatMap((d) => stories.filter((st) => st.dk === d).slice(0, 12))],
+    articles: byDesk[''],
   };
   await mkdir(OUT_DIR, { recursive: true });
-  const json = JSON.stringify(feed);
-  await writeFile(join(OUT_DIR, 'feed.json.tmp'), json);
-  await rename(join(OUT_DIR, 'feed.json.tmp'), join(OUT_DIR, 'feed.json'));
+  const write = async (name, data) => {
+    const text = JSON.stringify(data);
+    await writeFile(join(OUT_DIR, `${name}.tmp`), text);
+    await rename(join(OUT_DIR, `${name}.tmp`), join(OUT_DIR, name));
+    return text;
+  };
+  // as abas primeiro: quando o feed principal (com o novo updatedAt) aparece, elas já estão prontas
+  const deskSizes = {};
+  for (const d of DESKS) deskSizes[d] = (await write(`feed-${d}.json`, { v: 1, updatedAt: now, desk: d, articles: byDesk[d] })).length;
+  const json = await write('feed.json', feed);
   await writeSummaries(OUT_DIR, summaries);
   await writeFile(join(OUT_DIR, 'meta.json'), JSON.stringify({ updatedAt: now, count: articles.length, newest: articles[0]?.id || null }));
 
   // 6. Relatório
   const secs = ((Date.now() - started) / 1000).toFixed(1);
-  log(`\n${articles.length} matérias, ${stories.length} pautas em comum, ${(json.length / 1024).toFixed(0)} kB, ${Object.keys(summaries).length} resumos, ${secs}s`);
+  log(`\n${articles.length} matérias, ${stories.length} pautas em comum, ${Object.keys(summaries).length} resumos, ${secs}s`);
+  log(`feed.json ${(json.length / 1024).toFixed(0)} kB (${byDesk[''].length} matérias)${DESKS.map((d) => ` · feed-${d}.json ${(deskSizes[d] / 1024).toFixed(0)} kB (${byDesk[d].length})`).join('')}`);
   const failed = Object.entries(health).filter(([, h]) => h.errors.length);
   for (const [id, h] of failed) for (const e of h.errors) log(`  ✗ ${id}: ${e}`);
   if (report) {

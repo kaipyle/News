@@ -16,6 +16,8 @@ const ICONS = {
   mundo: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.6 3.5 5.4 3.5 8.5s-1.1 5.9-3.5 8.5c-2.4-2.6-3.5-5.4-3.5-8.5s1.1-5.9 3.5-8.5Z"/>',
   economia: '<path d="M4 19.5h16"/><path d="m5 15 4-4 3 3 6.5-6.5"/><path d="M14.5 7.5h4v4"/>',
   fontes: '<path d="M4 6.5h16M4 12h16M4 17.5h16"/><path d="M14 4.5v4M9 10v4M16 15.5v4"/>',
+  tecnologia: '<rect x="6.5" y="6.5" width="11" height="11" rx="2"/><path d="M10 10h4v4h-4zM9.5 3.5v3M14.5 3.5v3M9.5 17.5v3M14.5 17.5v3M3.5 9.5h3M3.5 14.5h3M17.5 9.5h3M17.5 14.5h3"/>',
+  cinema: '<path d="M4 10h16v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z"/><path d="m4 10-.6-3.3a1 1 0 0 1 .8-1.2l13.8-2.4a1 1 0 0 1 1.2.8L19.6 7 4 10Z"/><path d="m8.2 5.4 2.6 3.4M13.4 4.5 16 7.9"/>',
   back: '<path d="M15 5 8 12l7 7"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
   close: '<path d="M7 7l10 10M17 7 7 17"/>',
@@ -38,7 +40,9 @@ const VIEWS = [
   { id: 'brasil', label: 'Brasil' },
   { id: 'mundo', label: 'Mundo' },
   { id: 'economia', label: 'Economia' },
-  { id: 'fontes', label: 'Fontes' },
+  { id: 'tecnologia', label: 'Tecnologia' },
+  { id: 'cinema', label: 'Cinema' },
+  { id: 'fontes', label: 'Fontes', tab: false }, // fica no menu
 ];
 
 const BUCKETS = [
@@ -54,10 +58,12 @@ const laneOf = (x) => (x <= -0.25 ? 'e' : x >= 0.25 ? 'd' : 'c');
 const LANES = { e: 'Esquerda', c: 'Centro', d: 'Direita' };
 
 const VIEW_CHIPS = {
-  inicio: ['ultima-hora', 'guerras', 'petroleo', 'mercados', 'politica-int', 'economia-int', 'eleicoes', 'justica', 'tecnologia', 'clima', 'checagem'],
+  inicio: ['ultima-hora', 'guerras', 'petroleo', 'mercados', 'politica-int', 'economia-int', 'eleicoes', 'justica', 'clima', 'checagem'],
   brasil: ['eleicoes', 'justica', 'economia-br', 'checagem'],
   mundo: ['guerras', 'r:eua', 'r:america-latina', 'r:europa', 'r:russia-ucrania', 'r:oriente-medio', 'r:china', 'r:africa', 'economia-int'],
-  economia: ['mercados', 'petroleo', 'economia-br', 'economia-int', 'tecnologia'],
+  economia: ['mercados', 'petroleo', 'economia-br', 'economia-int'],
+  tecnologia: ['ia', 'bigtech', 'seguranca-digital', 'r:eua', 'r:china'],
+  cinema: ['cinema-br', 'streaming', 'premios', 'mercado-av'],
 };
 const ECON = ['economia-br', 'economia-int', 'mercados', 'petroleo'];
 const HOUR = 3600e3;
@@ -81,7 +87,41 @@ const state = {
   renderedHash: null,
   shards: new Map(), // resumos: arquivo → promessa (baixado só quando o leitor abre um resumo)
   shardData: new Map(), // resumos já baixados, para abrir sem esperar
+  desks: new Map(), // aba → 'loading' | 'ready'; matérias de Tecnologia e Cinema vêm de arquivos à parte
 };
+
+// Tecnologia e Cinema ficam em data/feed-<aba>.json: o app só baixa quando a aba (ou uma busca,
+// um perfil, um tema delas) precisa. As matérias entram na mesma lista, marcadas com _desk.
+const deskTopics = () => Object.fromEntries((state.data.topics || []).filter((t) => t.desk).map((t) => [t.id, t.desk]));
+function desksNeeded(r) {
+  const all = state.data.desks || [];
+  if (r.q || r.fonte || r.autor || r.view === 'fontes') return all;
+  const dt = deskTopics();
+  return all.filter((d) => r.view === d || r.tema.some((t) => dt[t] === d));
+}
+function loadDesk(d) {
+  if (state.desks.has(d)) return state.desks.get(d);
+  const base = state.data;
+  const p = fetch(`data/feed-${d}.json?v=${base.updatedAt}`)
+    .then((res) => (res.ok ? res.json() : { articles: [] }))
+    .catch(() => null)
+    .then((data) => {
+      // chegou uma coleta nova no meio do caminho: esta aba será baixada de novo para ela
+      if (state.data !== base) { state.desks.delete(d); return true; }
+      if (!data) { state.desks.delete(d); return false; } // sem conexão: tenta de novo na próxima vez
+      for (const a of data.articles || []) {
+        if (!state.src[a.s] || state.byId.has(a.id)) continue;
+        a._desk = d;
+        state.data.articles.push(a);
+        state.byId.set(a.id, a);
+      }
+      state.data.articles.sort((x, y) => y.d - x.d);
+      state.desks.set(d, 'ready');
+      return true;
+    });
+  state.desks.set(d, p);
+  return p;
+}
 
 // Resumos ficam em data/resumos/<n>.json; o primeiro caractere do id decide o arquivo
 // (mesma conta em lib/summary.mjs).
@@ -179,7 +219,10 @@ function matchTema(a, t) {
   return has(a, t);
 }
 
-function inView(a, view) {
+function inView(a, view, r) {
+  if (view === 'inicio') return !a._desk || !!r?.q;
+  if (view === 'tecnologia') return has(a, 'tecnologia');
+  if (view === 'cinema') return has(a, 'cinema');
   if (view === 'brasil') return has(a, 'politica-br');
   if (view === 'mundo') return (has(a, 'politica-int') || has(a, 'guerras')) && (!has(a, 'politica-br') || isForeign(a));
   if (view === 'economia') return ECON.some((t) => has(a, t));
@@ -191,7 +234,7 @@ function select(r, { ignoreView = false } = {}) {
   const scoped = !(r.fonte || r.autor) && !ignoreView;
   return state.data.articles.filter((a) => {
     const s = state.src[a.s];
-    if (scoped && !inView(a, r.view)) return false;
+    if (scoped && !inView(a, r.view, r)) return false;
     if (r.fonte && a.s !== r.fonte) return false;
     if (r.autor && !a.by?.includes(r.autor)) return false;
     if (r.tema.length && !r.tema.some((t) => matchTema(a, t))) return false;
@@ -392,7 +435,7 @@ function resetObserver() {
 
 function renderChrome() {
   const r = state.route;
-  const tabs = VIEWS.map((v) => `<a class="tab" href="#/${v.id === 'inicio' ? '' : v.id}" ${r.view === v.id && !r.fonte && !r.autor ? 'aria-current="page"' : ''}><span class="tab-ico">${icon(v.id, v.id === 'brasil' ? 'ico-brasil' : '')}</span><span>${v.label}</span></a>`).join('');
+  const tabs = VIEWS.filter((v) => v.tab !== false).map((v) => `<a class="tab" href="#/${v.id === 'inicio' ? '' : v.id}" ${r.view === v.id && !r.fonte && !r.autor ? 'aria-current="page"' : ''}><span class="tab-ico">${icon(v.id, v.id === 'brasil' ? 'ico-brasil' : '')}</span><span>${v.label}</span></a>`).join('');
   $('.tabs-bottom').innerHTML = tabs;
   $('.tabs-top').innerHTML = tabs;
 
@@ -453,7 +496,7 @@ function renderInicio(main, r) {
     html += notice(`<strong>Dica:</strong> toque no nome do jornal ou do autor para ver só as matérias dele. A régua abaixo do título mostra a linha editorial do veículo. <button class="text-btn" data-action="help">Como funciona</button>`, 'tip-done');
   }
   if (!filtered) {
-    const top = state.data.stories.filter((s) => Date.now() - s.d < 14 * HOUR).slice(0, 8);
+    const top = state.data.stories.filter((s) => !s.dk && Date.now() - s.d < 14 * HOUR).slice(0, 8);
     if (top.length) {
       html += `<section class="stories" aria-labelledby="h-stories"><div class="section-head intro" style="padding:16px var(--gutter) 8px"><p class="eyebrow" id="h-stories">Mais cobertas agora</p></div>
         <div class="stories-track">${top.map(storyCard).join('')}</div></section>`;
@@ -465,10 +508,15 @@ function renderInicio(main, r) {
   if (list.length) mountFeed($('#feed'), list);
 }
 
-function renderSimpleSection(main, r, { title, sub }) {
+function renderSimpleSection(main, r, { title, sub, desk = '' }) {
   const list = select(r);
   let html = headerNotices();
-  html += `<div class="section-head"><p class="eyebrow">${plural(list.length, 'matéria', 'matérias')} · últimas 72 h</p><h1 class="section-title">${title}</h1>${sub ? `<p class="section-sub">${sub}</p>` : ''}</div>`;
+  html += `<div class="section-head"><p class="eyebrow">${plural(list.length, 'matéria', 'matérias')} · ${desk ? 'últimos dias' : 'últimas 72 h'}</p><h1 class="section-title">${title}</h1>${sub ? `<p class="section-sub">${sub}</p>` : ''}</div>`;
+  const top = desk && !(filterCount(r) || r.q) ? state.data.stories.filter((s) => s.dk === desk && Date.now() - s.d < 24 * HOUR && s.ids.every((id) => state.byId.has(id))).slice(0, 8) : [];
+  if (top.length) {
+    html += `<section class="stories" aria-label="Mais cobertas agora"><div class="section-head intro" style="padding:8px var(--gutter) 8px"><p class="eyebrow">Mais cobertas agora</p></div>
+      <div class="stories-track">${top.map(storyCard).join('')}</div></section>`;
+  }
   html += activeFilterPills(r);
   html += list.length ? `<div class="feed" id="feed"></div>` : emptyState(r);
   main.innerHTML = html;
@@ -628,8 +676,10 @@ function renderFontes(main) {
     <div class="section-head"><p class="eyebrow">${all.length - official.length} veículos${official.length ? ` e ${official.length} fontes oficiais` : ''}</p><h1 class="section-title">Fontes</h1>
     <p class="section-sub">Escolhidas por rigor de apuração, com linhas editoriais diferentes de propósito. Toque num veículo para ver o perfil e só as matérias dele.</p></div>
     ${subscriptionsBox('fontes')}
-    ${group('Brasil', all.filter((s) => s.country === 'BR' && !s.official))}
-    ${group('Internacional', all.filter((s) => s.country !== 'BR' && !s.official))}
+    ${group('Brasil', all.filter((s) => s.country === 'BR' && !s.official && !s.desk))}
+    ${group('Internacional', all.filter((s) => s.country !== 'BR' && !s.official && !s.desk))}
+    ${group('Tecnologia', all.filter((s) => s.desk === 'tecnologia' && !s.official))}
+    ${group('Cinema e audiovisual', all.filter((s) => s.desk === 'cinema' && !s.official))}
     ${group('Fontes oficiais', official, { scale: false })}
     <h2 class="group-title" style="margin-top:32px">Como classificamos</h2>
     <div class="prose">
@@ -653,11 +703,23 @@ function render() {
   resetObserver();
   const main = $('#main');
   setWide(false);
+  const missing = desksNeeded(r).filter((d) => state.desks.get(d) !== 'ready');
+  if (missing.length) {
+    main.innerHTML = '<div class="loading" aria-live="polite" aria-label="Carregando"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>';
+    Promise.all(missing.map(loadDesk)).then((ok) => {
+      if (state.route !== r) return;
+      if (ok.every(Boolean)) return render();
+      main.innerHTML = `<div class="empty"><h2>Não deu para carregar esta aba</h2><p>Confira a conexão e tente de novo.</p><button class="btn" data-action="retry">Tentar de novo</button></div>`;
+    });
+    return;
+  }
   if (r.fonte || r.autor) renderScoped(main, r);
   else if (r.view === 'fontes') renderFontes(main);
   else if (r.view === 'brasil') renderBrasil(main, r);
   else if (r.view === 'mundo') renderSimpleSection(main, r, { title: 'Mundo', sub: 'Política internacional, guerras e conflitos. Matérias sobre o Brasil ficam na aba Brasil.' });
   else if (r.view === 'economia') renderSimpleSection(main, r, { title: 'Economia', sub: 'Bolsa, juros e câmbio, petróleo e energia, economia brasileira e global.' });
+  else if (r.view === 'tecnologia') renderSimpleSection(main, r, { title: 'Tecnologia', sub: 'Inteligência artificial, big techs, segurança digital, telecom e startups.', desk: 'tecnologia' });
+  else if (r.view === 'cinema') renderSimpleSection(main, r, { title: 'Cinema e audiovisual', sub: 'Cinema brasileiro e mundial, séries e streaming, festivais, mercado e editais.', desk: 'cinema' });
   else renderInicio(main, r);
   document.title = r.fonte ? `${state.src[r.fonte]?.name} · Mirante` : r.autor ? `${r.autor} · Mirante` : r.view === 'inicio' ? 'Mirante' : `${VIEWS.find((v) => v.id === r.view).label} · Mirante`;
 }
@@ -828,6 +890,7 @@ function openHelp() {
     <p>As cores seguem o campo: <span class="lean-label lane-e">roxo à esquerda</span>, <span class="lean-label lane-c">cinza no centro</span> e <span class="lean-label lane-d">laranja à direita</span>. A barra cresce do centro até a agulha: quanto mais longa, mais distante do centro. Não usamos vermelho e azul porque significam coisas opostas no Brasil e nos EUA.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Navegar</h3>
     <p><strong>Toque na matéria</strong> para ler o resumo: a linha fina e o começo do texto, como o veículo publicou. Dali, <strong>Ler a matéria</strong> abre o site do veículo. No computador, Ctrl ou ⌘ + clique abre direto. <strong>Toque no nome do jornal</strong> para ver o perfil (dono, linha editorial, rigor) e só as matérias dele. <strong>Toque no autor</strong> para ver tudo o que ele publicou.</p>
+    <p><strong>Tecnologia</strong> e <strong>Cinema</strong> têm abas próprias, com sites especializados (The Verge, Wired, Tecnoblog, Variety, Deadline, Tela Viva…) e os cadernos dos jornais. Essas matérias não entram no Início, para não afogar o noticiário; a busca encontra tudo.</p>
     <p>Os <strong>temas</strong> logo abaixo do topo filtram a seção com um toque. <strong>Filtros</strong>, no menu, combina linha editorial, tema, região, país, idioma e tipo de texto.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Brasil: os dois lados</h3>
     <p>A aba Brasil mostra a política nacional separada por campo. <strong>Mesma pauta</strong> junta o mesmo fato contado por veículos diferentes; quando um lado não noticia, isso aparece.</p>
@@ -837,7 +900,7 @@ function openHelp() {
     <h3 class="lane-tag" style="margin:20px 0 8px">Atualização</h3>
     <p>As fontes são lidas a cada 15 minutos. Última coleta: ${esc(updated)}. A lista se atualiza sozinha; para buscar na hora, puxe a tela para baixo no topo.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Minhas assinaturas</h3>
-    <p>No <strong>menu</strong> (botão ☰ no topo), toque em <strong>Ocultar pagos</strong> para esconder os jornais pagos que você não assina; toque de novo para mostrar todos. Ele fica ligado até você desligar, em qualquer aba ou tema. Para dizer quais jornais você assina, use o botão <strong>Assinaturas</strong> do aviso, a seção no topo dos <strong>Filtros</strong> ou a aba <strong>Fontes</strong>. Fica salvo neste aparelho: no computador e no celular a escolha é feita separadamente.</p>
+    <p>No <strong>menu</strong> (botão ☰ no topo), toque em <strong>Ocultar pagos</strong> para esconder os jornais pagos que você não assina; toque de novo para mostrar todos. Ele fica ligado até você desligar, em qualquer aba ou tema. Para dizer quais jornais você assina, use o botão <strong>Assinaturas</strong> do aviso, a seção no topo dos <strong>Filtros</strong> ou <strong>Fontes</strong>, no menu. Fica salvo neste aparelho: no computador e no celular a escolha é feita separadamente.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Tradução</h3>
     <p><strong>Traduzir para o português</strong>, no menu, mostra as matérias em inglês em português: título e resumo traduzidos automaticamente (marcados com "Traduzido") e a matéria abre pelo Google Tradutor. Toque de novo para voltar ao original. Sites com paywall podem não abrir traduzidos; no iPhone, o Safari também traduz pelo botão <strong>aA</strong> da barra de endereço.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Menu</h3>
@@ -903,6 +966,8 @@ document.addEventListener('click', (ev) => {
   switch (t.dataset.action) {
     case 'filters': return openFilters();
     case 'help': return openHelp();
+    case 'fontes': return go({ ...EMPTY, view: 'fontes' });
+    case 'retry': return render();
     case 'translate':
       state.translate = !state.translate;
       store.set('translate', state.translate);
@@ -1011,6 +1076,7 @@ const menuItems = () => [
   { action: 'edit-subs', label: 'Minhas assinaturas', icon: 'subs', badge: state.subs.size },
   { action: 'translate', label: 'Traduzir para o português', icon: 'translate', on: state.translate },
   { action: 'theme', label: 'Modo escuro', icon: 'moon', on: isDark() },
+  { action: 'fontes', label: 'Fontes', icon: 'fontes' },
   { action: 'help', label: 'Como funciona', icon: 'help' },
 ];
 
@@ -1101,6 +1167,7 @@ new ResizeObserver(measureHead).observe($('.top'));
 
 function ingest(data) {
   if (state.data?.updatedAt !== data.updatedAt) { state.shards.clear(); state.shardData.clear(); }
+  state.desks.clear(); // coleta nova: as abas são baixadas de novo quando forem abertas
   state.data = data;
   state.src = Object.fromEntries(data.sources.map((s) => [s.id, s]));
   state.byId = new Map(data.articles.map((a) => [a.id, a]));

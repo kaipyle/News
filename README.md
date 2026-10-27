@@ -1,12 +1,13 @@
 # Mirante
 
-Hub pessoal de notícias: reúne 40 veículos selecionados por rigor de apuração e 3 fontes oficiais (B3, Banco Central e Federal Reserve) num só feed, com a **linha editorial de cada veículo** numa régua logo abaixo do título.
+Hub pessoal de notícias: reúne 59 veículos selecionados por rigor de apuração e 4 fontes oficiais (B3, Banco Central, Federal Reserve e Spcine) num só feed, com a **linha editorial de cada veículo** numa régua logo abaixo do título.
 
 - **Início**: tudo o que saiu, do mais recente para o mais antigo, com "Mais cobertas agora" no topo.
 - **Resumo antes de abrir**: tocar na matéria abre a linha fina e o começo do texto, como o veículo publicou (traduzidos, se a tradução estiver ligada). Dali, **Ler a matéria** abre o site.
 - **Brasil — os dois lados**: política nacional separada em esquerda, centro e direita, com "Mesma pauta, ângulos diferentes" (o mesmo fato contado por veículos de campos diferentes, e quem não noticiou).
 - **Mundo** e **Economia**: política internacional, guerras, petróleo, bolsa, juros e câmbio. Na economia entram também veículos de mercado (Valor Investe, Brazil Journal, NeoFeed, Bloomberg Línea, Exame Invest, CNBC) e as fontes oficiais.
-- **Fontes**: perfil de cada veículo (dono, linha editorial, rigor, paywall) e só as matérias dele.
+- **Tecnologia** e **Cinema**: abas com sites especializados e os cadernos dos jornais. Tecnologia tem atalhos para IA, big techs e segurança digital (Tecnoblog, Núcleo, MIT Technology Review, The Verge, Wired, Ars Technica, TechCrunch, Rest of World, 404 Media…). Cinema tem cinema brasileiro, séries e streaming, festivais e prêmios, e mercado e editais (Tela Viva, Revista de Cinema, Spcine, Variety, The Hollywood Reporter, Deadline, IndieWire, TheWrap, No Film School, além de Ilustrada, Estadão Cultura, g1 Pop & Arte, Guardian e NYT). Essas matérias não entram no Início e ficam em arquivos à parte, baixados só quando a aba é aberta.
+- **Fontes** (no menu): perfil de cada veículo (dono, linha editorial, rigor, paywall) e só as matérias dele.
 - Toque no **jornal** ou no **autor** de qualquer matéria para filtrar por ele. Filtros por linha editorial, tema, região, país, idioma e opinião × notícia.
 - **Minhas assinaturas**: marque os jornais pagos que você assina e ligue "Só gratuitos e minhas assinaturas" para ver só o que consegue abrir (fica salvo em cada aparelho).
 - **Tradução**: o botão 文A mostra as matérias em inglês em português e abre o texto pelo Google Tradutor.
@@ -54,7 +55,8 @@ A lista completa, com dono, nota editorial e feeds, fica em [`config/sources.mjs
 - **WSJ** tem duas réguas: reportagem perto do centro e página de opinião à direita (o feed de opinião carrega o próprio viés).
 - **Opinião × notícia**: colunas, editoriais e análises são marcados pelo endereço da matéria (`/opiniao/`, `/colunas/`, `/opinion/`…).
 - **Reuters e AP** não oferecem RSS público; os títulos chegam pelo Google Notícias, sem autor nem resumo. **The Economist** não assina textos por política própria.
-- **Fontes oficiais** (B3, Banco Central, Federal Reserve) não são jornalismo e ficam fora da régua: servem para conferir na origem o que os veículos noticiam.
+- **Fontes oficiais** (B3, Banco Central, Federal Reserve, Spcine) não são jornalismo e ficam fora da régua: servem para conferir na origem o que os veículos noticiam.
+- **Sites de tecnologia e entretenimento** publicam ofertas e conteúdo patrocinado junto com notícia; esses itens são descartados pelo título e pelo autor. Dos cadernos de cultura dos jornais só entra o que for cinema e TV.
 - **Resumo**: é um trecho do próprio veículo (linha fina + primeiros parágrafos, até ~450 caracteres, cortado em fim de frase), lido do feed ou da página da matéria. Não é texto gerado por IA. Para uso pessoal não há problema; num lançamento comercial, trechos assim precisam de autorização dos veículos.
 
 O lado direito tem menos veículos de qualidade no Brasil do que o esquerdo e o centro: Estadão e Veja (centro-direita) e Gazeta do Povo (direita). A aba Brasil compensa isso intercalando os três campos e mostrando o volume de cada um.

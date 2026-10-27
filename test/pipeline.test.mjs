@@ -255,3 +255,34 @@ test('resumo: limpa restos de feed e espaço antes de pontuação', () => {
   assert.equal(tidySummary('Escândalos mostram o perigo. O post Flávio e as milícias apareceu primeiro em Intercept Brasil.'), 'Escândalos mostram o perigo.');
   assert.equal(tidySummary("Follow the day's news live Get our breaking news email, free app or daily news podcast Katy Gallagher said"), 'Katy Gallagher said');
 });
+
+test('resumo: botões de compartilhar, aviso de newsletter e rótulo "Resumo" saem', () => {
+  assert.equal(tidySummary('Download E-mail Enviar A eleição terminou no domingo.'), 'A eleição terminou no domingo.');
+  assert.equal(tidySummary('This story originally appeared in The Algorithm, our weekly newsletter on AI. To get stories like this in your inbox first, sign up here . After weeks of speculation, Anthropic filed.'), 'After weeks of speculation, Anthropic filed.');
+  assert.equal(tidySummary('Resumo A Giga+ confirmou conversas com a Sky.'), 'A Giga+ confirmou conversas com a Sky.');
+});
+
+test('tecnologia e cinema: subtemas marcam o tema pai, AI-5 não é IA, cultura só passa cinema', () => {
+  const g = (title, src, section = 'geral') => classify({ url: 'https://x.com/a/b', title, excerpt: '', section, source: SOURCES.find((s) => s.id === src) });
+  const ia = g('OpenAI lança novo modelo de linguagem', 'folha');
+  assert.ok(ia.topics.includes('ia') && ia.topics.includes('tecnologia'));
+  assert.ok(!g('Bolsonaro defende AI-5 em entrevista', 'folha').topics.includes('ia'), 'AI-5 é o ato institucional');
+  assert.ok(g('AI startups raise record funding', 'nyt').topics.includes('ia'));
+  const f = g('Filme brasileiro vence a Palma de Ouro em Cannes', 'folha');
+  for (const t of ['cinema', 'cinema-br', 'premios']) assert.ok(f.topics.includes(t), t);
+  assert.ok(g('Netflix aumenta preços no Brasil', 'g1').topics.includes('streaming'));
+
+  // caderno de cultura: show de música sai, estreia de filme fica
+  const folha = SOURCES.find((s) => s.id === 'folha');
+  const cultura = { url: 'x', section: 'cultura' };
+  const item = (title, link) => ({ title, link, date: '2026-10-26T12:00:00Z', description: '', content: '', authors: [] });
+  assert.equal(toArticle(item('AC/DC faz show de sangue, suor e lágrimas em SP', 'https://www1.folha.uol.com.br/ilustrada/2026/10/acdc.shtml'), cultura, folha, NOW), null);
+  const film = toArticle(item('Filme de Kleber Mendonça estreia nos cinemas', 'https://www1.folha.uol.com.br/ilustrada/2026/10/filme.shtml'), cultura, folha, NOW);
+  assert.ok(film && film.tp.includes('cinema'));
+  // em sites especializados, ofertas e conteúdo patrocinado ficam de fora
+  const verge = SOURCES.find((s) => s.id === 'verge');
+  if (verge) {
+    assert.equal(toArticle(item('Samsung MicroSD card is on sale for less than $50', 'https://www.theverge.com/x'), verge.feeds[0], verge, NOW), null);
+    assert.ok(toArticle(item('OpenAI announces three science discoveries', 'https://www.theverge.com/y'), verge.feeds[0], verge, NOW));
+  }
+});

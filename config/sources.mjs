@@ -9,6 +9,8 @@
 // maxAgeHours: até quanto tempo atrás manter matérias (veículos de ritmo semanal ganham mais).
 // official: fonte primária (banco central, bolsa), não veículo jornalístico; fica fora da régua.
 // titleStrip: trecho burocrático a tirar do começo dos títulos (regex).
+// desk: veículo especializado com aba própria ('tecnologia' | 'cinema'); fica fora do Início.
+// maxItems: teto de matérias guardadas do veículo (sites que publicam dezenas por dia).
 
 export const SOURCES = [
   // ───────────── Brasil ─────────────
@@ -22,6 +24,8 @@ export const SOURCES = [
       { url: 'https://feeds.folha.uol.com.br/mundo/rss091.xml', section: 'mundo' },
       { url: 'https://feeds.folha.uol.com.br/mercado/rss091.xml', section: 'economia' },
       { url: 'https://feeds.folha.uol.com.br/opiniao/rss091.xml', section: 'opiniao' },
+      { url: 'https://feeds.folha.uol.com.br/tec/rss091.xml', section: 'tecnologia' },
+      { url: 'https://feeds.folha.uol.com.br/ilustrada/rss091.xml', section: 'cultura' },
     ],
   },
   {
@@ -34,6 +38,7 @@ export const SOURCES = [
       { url: 'https://www.estadao.com.br/arc/outboundfeeds/feeds/rss/sections/economia/', section: 'economia' },
       { url: 'https://www.estadao.com.br/arc/outboundfeeds/feeds/rss/sections/internacional/', section: 'mundo' },
       { url: 'https://www.estadao.com.br/arc/outboundfeeds/feeds/rss/sections/opiniao/', section: 'opiniao' },
+      { url: 'https://www.estadao.com.br/arc/outboundfeeds/feeds/rss/sections/cultura/', section: 'cultura' },
     ],
   },
   {
@@ -52,6 +57,8 @@ export const SOURCES = [
       { url: 'https://g1.globo.com/rss/g1/politica/', section: 'politica' },
       { url: 'https://g1.globo.com/rss/g1/economia/', section: 'economia' },
       { url: 'https://g1.globo.com/rss/g1/mundo/', section: 'mundo' },
+      { url: 'https://g1.globo.com/rss/g1/tecnologia/', section: 'tecnologia' },
+      { url: 'https://g1.globo.com/rss/g1/pop-arte/', section: 'cultura' },
     ],
   },
   {
@@ -208,6 +215,59 @@ export const SOURCES = [
       { url: 'https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/noticias', section: 'economia' },
     ],
   },
+
+  // ───────────── Brasil: tecnologia ─────────────
+  {
+    id: 'tecnoblog', name: 'Tecnoblog', short: 'Tecnoblog', country: 'BR', lang: 'pt',
+    bias: 0, rigor: 'bom', kind: 'Digital', paywall: false, desk: 'tecnologia', maxItems: 120,
+    owner: 'Independente', url: 'https://tecnoblog.net',
+    note: 'Centro. Site de tecnologia mais lido do país, com bom noticiário de telecom, big techs e regulação; as páginas de ofertas ficam de fora.',
+    feeds: [{ url: 'https://tecnoblog.net/feed/', section: 'tecnologia' }],
+  },
+  {
+    id: 'nucleo', name: 'Núcleo Jornalismo', short: 'Núcleo', country: 'BR', lang: 'pt',
+    bias: -0.35, rigor: 'alto', kind: 'Digital', paywall: false, desk: 'tecnologia', maxAgeHours: 168,
+    owner: 'Independente', url: 'https://nucleo.jor.br',
+    note: 'Centro-esquerda. Jornalismo sobre internet, plataformas e dados, crítico das big techs; bom para entender redes sociais e eleições.',
+    feeds: [{ url: 'https://nucleo.jor.br/feed/', section: 'tecnologia' }],
+  },
+  {
+    id: 'mittrbr', name: 'MIT Technology Review Brasil', short: 'MIT Tech Review BR', country: 'BR', lang: 'pt',
+    bias: 0, rigor: 'bom', kind: 'Revista', paywall: false, desk: 'tecnologia', maxAgeHours: 120,
+    owner: 'Edição brasileira licenciada da revista do MIT', url: 'https://mittechreview.com.br',
+    note: 'Centro. Mistura traduções da edição americana com textos sobre tecnologia e negócios no Brasil.',
+    feeds: [{ url: 'https://mittechreview.com.br/feed/', section: 'tecnologia' }],
+  },
+  {
+    id: 'mobiletime', name: 'Mobile Time', short: 'Mobile Time', country: 'BR', lang: 'pt',
+    bias: 0, rigor: 'bom', kind: 'Publicação setorial', paywall: false, desk: 'tecnologia',
+    owner: 'Converge Comunicações', url: 'https://www.mobiletime.com.br',
+    note: 'Centro. Publicação setorial de mobilidade, apps, pagamentos e telecom; escreve para quem trabalha no setor.',
+    feeds: [{ url: 'https://www.mobiletime.com.br/feed/', section: 'tecnologia' }],
+  },
+
+  // ───────────── Brasil: cinema e audiovisual ─────────────
+  {
+    id: 'telaviva', name: 'Tela Viva', short: 'Tela Viva', country: 'BR', lang: 'pt',
+    bias: 0, rigor: 'alto', kind: 'Publicação setorial', paywall: false, desk: 'cinema',
+    owner: 'Converge Comunicações', url: 'https://telaviva.com.br',
+    note: 'Centro. A principal publicação do mercado audiovisual brasileiro: TV, streaming, produção, Ancine e regulação.',
+    feeds: [{ url: 'https://telaviva.com.br/feed/', section: 'cinema' }],
+  },
+  {
+    id: 'revistadecinema', name: 'Revista de Cinema', short: 'Revista de Cinema', country: 'BR', lang: 'pt',
+    bias: 0, rigor: 'bom', kind: 'Revista', paywall: false, desk: 'cinema', maxAgeHours: 168,
+    owner: 'Independente', url: 'https://revistadecinema.com.br',
+    note: 'Centro. Cobertura do cinema brasileiro: lançamentos, festivais, produção e distribuição.',
+    feeds: [{ url: 'https://revistadecinema.com.br/feed/', section: 'cinema' }],
+  },
+  {
+    id: 'spcine', name: 'Spcine', short: 'Spcine', country: 'BR', lang: 'pt',
+    bias: 0, rigor: 'fonte primária', kind: 'Fonte oficial', paywall: false, official: true, desk: 'cinema', maxAgeHours: 168,
+    owner: 'Empresa de cinema e audiovisual da Prefeitura de São Paulo', url: 'https://spcine.com.br',
+    note: 'Editais, linhas de fomento, Film Commission e o Circuito Spcine de salas públicas. Fonte primária para quem produz em São Paulo.',
+    feeds: [{ url: 'https://spcine.com.br/feed/', section: 'cinema' }],
+  },
   {
     id: 'aosfatos', name: 'Aos Fatos', short: 'Aos Fatos', country: 'BR', lang: 'pt',
     bias: -0.1, rigor: 'muito alto', kind: 'Checagem', paywall: false, maxAgeHours: 168,
@@ -252,6 +312,7 @@ export const SOURCES = [
       { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', section: 'mundo' },
       { url: 'https://feeds.bbci.co.uk/news/world/latin_america/rss.xml', section: 'mundo' },
       { url: 'https://feeds.bbci.co.uk/news/business/rss.xml', section: 'economia' },
+      { url: 'https://feeds.bbci.co.uk/news/technology/rss.xml', section: 'tecnologia' },
     ],
   },
   {
@@ -263,6 +324,7 @@ export const SOURCES = [
       { url: 'https://www.ft.com/world?format=rss', section: 'mundo' },
       { url: 'https://www.ft.com/global-economy?format=rss', section: 'economia' },
       { url: 'https://www.ft.com/markets?format=rss', section: 'mercados' },
+      { url: 'https://www.ft.com/technology?format=rss', section: 'tecnologia' },
     ],
   },
   {
@@ -286,6 +348,7 @@ export const SOURCES = [
       { url: 'https://feeds.content.dowjones.io/public/rss/RSSWorldNews', section: 'mundo' },
       { url: 'https://feeds.content.dowjones.io/public/rss/RSSMarketsMain', section: 'mercados' },
       { url: 'https://feeds.content.dowjones.io/public/rss/WSJcomUSBusiness', section: 'economia' },
+      { url: 'https://feeds.content.dowjones.io/public/rss/RSSWSJD', section: 'tecnologia' },
       { url: 'https://feeds.content.dowjones.io/public/rss/RSSOpinion', section: 'opiniao', bias: 0.7 },
     ],
   },
@@ -299,6 +362,8 @@ export const SOURCES = [
       { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Americas.xml', section: 'mundo' },
       { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml', section: 'mundo' },
       { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Economy.xml', section: 'economia' },
+      { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml', section: 'tecnologia' },
+      { url: 'https://rss.nytimes.com/services/xml/rss/nyt/Movies.xml', section: 'cinema' },
     ],
   },
   {
@@ -309,6 +374,7 @@ export const SOURCES = [
     feeds: [
       { url: 'https://feeds.bloomberg.com/markets/news.rss', section: 'mercados' },
       { url: 'https://feeds.bloomberg.com/economics/news.rss', section: 'economia' },
+      { url: 'https://feeds.bloomberg.com/technology/news.rss', section: 'tecnologia' },
       { url: 'https://feeds.bloomberg.com/politics/news.rss', section: 'mundo' },
     ],
   },
@@ -321,6 +387,8 @@ export const SOURCES = [
       { url: 'https://www.theguardian.com/world/rss', section: 'mundo' },
       { url: 'https://www.theguardian.com/world/americas/rss', section: 'mundo' },
       { url: 'https://www.theguardian.com/business/rss', section: 'economia' },
+      { url: 'https://www.theguardian.com/technology/rss', section: 'tecnologia' },
+      { url: 'https://www.theguardian.com/film/rss', section: 'cinema' },
     ],
   },
   {
@@ -391,6 +459,101 @@ export const SOURCES = [
     owner: 'Banco central dos Estados Unidos', url: 'https://www.federalreserve.gov',
     note: 'Comunicados oficiais do banco central americano: decisões de juros, atas e medidas de supervisão bancária.',
     feeds: [{ url: 'https://www.federalreserve.gov/feeds/press_all.xml', section: 'mercados' }],
+  },
+
+  // ───────────── Internacional: tecnologia ─────────────
+  {
+    id: 'verge', name: 'The Verge', short: 'The Verge', country: 'US', lang: 'en',
+    bias: -0.35, rigor: 'alto', kind: 'Digital', paywall: false, desk: 'tecnologia', maxItems: 120,
+    owner: 'Vox Media', url: 'https://www.theverge.com',
+    note: 'Centro-esquerda. Tecnologia de consumo, big techs e cultura digital, com boa cobertura de regulação.',
+    feeds: [{ url: 'https://www.theverge.com/rss/index.xml', section: 'tecnologia' }],
+  },
+  {
+    id: 'arstechnica', name: 'Ars Technica', short: 'Ars Technica', country: 'US', lang: 'en',
+    bias: -0.2, rigor: 'alto', kind: 'Digital', paywall: false, desk: 'tecnologia', maxItems: 120,
+    owner: 'Condé Nast', url: 'https://arstechnica.com',
+    note: 'Centro. Tecnologia e ciência explicadas com profundidade técnica; também publica curiosidades científicas.',
+    feeds: [{ url: 'https://feeds.arstechnica.com/arstechnica/index', section: 'tecnologia' }],
+  },
+  {
+    id: 'wired', name: 'Wired', short: 'Wired', country: 'US', lang: 'en',
+    bias: -0.35, rigor: 'alto', kind: 'Revista', paywall: true, desk: 'tecnologia', maxItems: 120,
+    owner: 'Condé Nast', url: 'https://www.wired.com',
+    note: 'Centro-esquerda. Reportagem sobre tecnologia, poder e sociedade; as páginas de ofertas ficam de fora.',
+    feeds: [{ url: 'https://www.wired.com/feed/rss', section: 'tecnologia' }],
+  },
+  {
+    id: 'techcrunch', name: 'TechCrunch', short: 'TechCrunch', country: 'US', lang: 'en',
+    bias: -0.1, rigor: 'bom', kind: 'Digital', paywall: false, desk: 'tecnologia', maxItems: 120,
+    owner: 'Regent', url: 'https://techcrunch.com',
+    note: 'Centro. Startups, investimento de risco e o negócio da tecnologia; tom próximo do Vale do Silício.',
+    feeds: [{ url: 'https://techcrunch.com/feed/', section: 'tecnologia' }],
+  },
+  {
+    id: 'mittr', name: 'MIT Technology Review', short: 'MIT Tech Review', country: 'US', lang: 'en',
+    bias: -0.2, rigor: 'muito alto', kind: 'Revista', paywall: true, desk: 'tecnologia', maxAgeHours: 120,
+    owner: 'Instituto de Tecnologia de Massachusetts (MIT)', url: 'https://www.technologyreview.com',
+    note: 'Centro. Análise de IA, biotecnologia e clima com rigor acadêmico; mais análise do que notícia quente.',
+    feeds: [{ url: 'https://www.technologyreview.com/feed/', section: 'tecnologia' }],
+  },
+  {
+    id: 'restofworld', name: 'Rest of World', short: 'Rest of World', country: 'US', lang: 'en',
+    bias: -0.25, rigor: 'alto', kind: 'Digital', paywall: false, desk: 'tecnologia', maxAgeHours: 168,
+    owner: 'Organização sem fins lucrativos', url: 'https://restofworld.org',
+    note: 'Centro-esquerda. Tecnologia fora dos EUA e da Europa, com muita cobertura de América Latina e Ásia.',
+    feeds: [{ url: 'https://restofworld.org/feed/latest', section: 'tecnologia' }],
+  },
+  {
+    id: '404media', name: '404 Media', short: '404 Media', country: 'US', lang: 'en',
+    bias: -0.45, rigor: 'alto', kind: 'Digital', paywall: false, desk: 'tecnologia', maxAgeHours: 120,
+    owner: 'Cooperativa de jornalistas', url: 'https://www.404media.co',
+    note: 'Centro-esquerda. Investigação sobre vigilância, privacidade e abusos das empresas de tecnologia.',
+    feeds: [{ url: 'https://www.404media.co/rss/', section: 'tecnologia' }],
+  },
+
+  // ───────────── Internacional: cinema e audiovisual ─────────────
+  {
+    id: 'variety', name: 'Variety', short: 'Variety', country: 'US', lang: 'en',
+    bias: -0.25, rigor: 'alto', kind: 'Publicação setorial', paywall: false, desk: 'cinema', maxAgeHours: 48, maxItems: 120,
+    owner: 'Penske Media', url: 'https://variety.com',
+    note: 'Centro-esquerda. A publicação de referência da indústria do entretenimento: negócios, estúdios, festivais e bilheteria.',
+    feeds: [{ url: 'https://variety.com/feed/', section: 'cinema' }],
+  },
+  {
+    id: 'thr', name: 'The Hollywood Reporter', short: 'Hollywood Reporter', country: 'US', lang: 'en',
+    bias: -0.25, rigor: 'alto', kind: 'Publicação setorial', paywall: false, desk: 'cinema', maxAgeHours: 48, maxItems: 120,
+    owner: 'Penske Media', url: 'https://www.hollywoodreporter.com',
+    note: 'Centro-esquerda. Indústria de cinema e TV, com entrevistas longas e os bastidores dos prêmios.',
+    feeds: [{ url: 'https://www.hollywoodreporter.com/feed/', section: 'cinema' }],
+  },
+  {
+    id: 'deadline', name: 'Deadline', short: 'Deadline', country: 'US', lang: 'en',
+    bias: -0.15, rigor: 'bom', kind: 'Publicação setorial', paywall: false, desk: 'cinema', maxAgeHours: 48, maxItems: 120,
+    owner: 'Penske Media', url: 'https://deadline.com',
+    note: 'Centro. O mais rápido nos negócios de Hollywood: contratações, vendas de projetos e bilheteria do fim de semana.',
+    feeds: [{ url: 'https://deadline.com/feed/', section: 'cinema' }],
+  },
+  {
+    id: 'indiewire', name: 'IndieWire', short: 'IndieWire', country: 'US', lang: 'en',
+    bias: -0.35, rigor: 'bom', kind: 'Digital', paywall: false, desk: 'cinema', maxItems: 120,
+    owner: 'Penske Media', url: 'https://www.indiewire.com',
+    note: 'Centro-esquerda. Cinema independente, festivais, direção e ofício; boa crítica.',
+    feeds: [{ url: 'https://www.indiewire.com/feed/', section: 'cinema' }],
+  },
+  {
+    id: 'thewrap', name: 'TheWrap', short: 'TheWrap', country: 'US', lang: 'en',
+    bias: -0.25, rigor: 'bom', kind: 'Digital', paywall: false, desk: 'cinema', maxAgeHours: 48, maxItems: 100,
+    owner: 'Independente (Sharon Waxman)', url: 'https://www.thewrap.com',
+    note: 'Centro-esquerda. Negócios de mídia e entretenimento, streaming e estúdios.',
+    feeds: [{ url: 'https://www.thewrap.com/feed/', section: 'cinema' }],
+  },
+  {
+    id: 'nofilmschool', name: 'No Film School', short: 'No Film School', country: 'US', lang: 'en',
+    bias: 0, rigor: 'bom', kind: 'Digital', paywall: false, desk: 'cinema', maxAgeHours: 120,
+    owner: 'Independente', url: 'https://nofilmschool.com',
+    note: 'Centro. Ofício e negócio de quem faz filmes: equipamento, roteiro, financiamento e distribuição independente.',
+    feeds: [{ url: 'https://nofilmschool.com/rss.xml', section: 'cinema' }],
   },
 ];
 

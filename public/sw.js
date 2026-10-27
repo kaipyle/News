@@ -1,5 +1,5 @@
 // Service worker: abre o app sem rede e guarda a última coleta de notícias.
-const VERSION = 'mirante-v10';
+const VERSION = 'mirante-v11';
 const SHELL = [
   './', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',

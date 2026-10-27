@@ -5,6 +5,9 @@
 // `not`: expressões descartadas antes de procurar o tema ("guerra comercial" não é guerra).
 // `scope`: 'br' = só vale por palavra-chave em veículos brasileiros; 'int' = só em internacionais.
 //   Fora do escopo, o tema ainda pode vir da seção do feed ou exigir a região certa (ver classify).
+// `desk`: tema com aba própria (Tecnologia, Cinema). Matéria só desses temas fica fora do Início
+//   e vai para um arquivo à parte, que o app só baixa quando o leitor abre a aba.
+// `parent`: subtema; marcar o subtema marca também o tema pai.
 
 export const TOPICS = [
   {
@@ -95,13 +98,90 @@ export const TOPICS = [
     ],
   },
   {
-    id: 'tecnologia', label: 'Tecnologia e IA', short: 'Tecnologia',
+    id: 'tecnologia', label: 'Tecnologia e IA', short: 'Tecnologia', desk: 'tecnologia',
     words: [
       'inteligencia artificial', 'artificial intelligence', 'big tech*', 'openai', 'anthropic', 'nvidia', 'chatgpt',
       'semicondutor*', 'semiconductor*', 'chipmaker*', 'microchip*', 'algoritmo*', 'algorithm*', 'ciberataque*',
       'cyberattack*', 'hacker*', 'data center*', 'datacenter*', 'startup*', 'deepmind', 'microsoft', 'alphabet',
     ],
     cased: ['IA', 'AI'],
+    not: ['ai-5'],
+  },
+  {
+    id: 'ia', label: 'Inteligência artificial', short: 'IA', parent: 'tecnologia', desk: 'tecnologia',
+    words: [
+      'inteligencia artificial', 'artificial intelligence', 'ia generativa', 'generative ai', 'chatgpt', 'openai',
+      'anthropic', 'deepmind', 'gemini', 'copilot', 'llm*', 'large language model*', 'modelo de linguagem',
+      'modelos de linguagem', 'machine learning', 'aprendizado de maquina', 'chatbot*', 'agentes de ia', 'ai agent*',
+      'nvidia', 'mistral ai', 'deepseek', 'xai', 'grok',
+    ],
+    cased: ['IA', 'AI', 'A.I.'],
+    not: ['ai-5'],
+  },
+  {
+    id: 'bigtech', label: 'Big techs e regulação', short: 'Big techs', parent: 'tecnologia', desk: 'tecnologia',
+    words: [
+      'big tech*', 'google', 'alphabet', 'apple', 'microsoft', 'meta platforms', 'zuckerberg', 'bytedance', 'amazon.com',
+      'aws', 'bezos', 'tim cook', 'sundar pichai', 'satya nadella', 'spacex', 'starlink', 'regulacao das redes',
+      'regulacao das plataformas', 'plataformas digitais', 'moderacao de conteudo', 'marco civil da internet',
+      'pl das fake news', 'antitruste', 'antitrust', 'digital markets act', 'content moderation',
+    ],
+  },
+  {
+    id: 'seguranca-digital', label: 'Segurança digital', short: 'Segurança', parent: 'tecnologia', desk: 'tecnologia',
+    words: [
+      'ciberataque*', 'ataque hacker', 'ataques hackers', 'hacker*', 'vazamento de dados', 'ransomware', 'malware',
+      'phishing', 'golpe digital', 'golpes digitais', 'golpe do pix', 'ciberseguranca', 'seguranca cibernetica',
+      'cyberattack*', 'cybersecurity', 'data breach*', 'spyware', 'zero-day', 'deepfake*',
+    ],
+  },
+  {
+    id: 'cinema', label: 'Cinema e audiovisual', short: 'Cinema', desk: 'cinema',
+    words: [
+      'cinema', 'cinemas', 'filme', 'filmes', 'longa-metragem', 'longas-metragens', 'curta-metragem', 'documentario',
+      'documentarios', 'cineasta*', 'roteirista*', 'audiovisual', 'bilheteria*', 'hollywood', 'netflix', 'globoplay',
+      'prime video', 'disney+', 'hbo', 'minisserie*', 'serie de tv', 'series de tv', 'film', 'films', 'filmmaker*',
+      'movie', 'movies', 'box office', 'screenplay*', 'showrunner*', 'tv series', 'ancine', 'oscars', 'festival de cannes',
+      'berlinale',
+    ],
+  },
+  {
+    id: 'cinema-br', label: 'Cinema brasileiro', short: 'Cinema BR', parent: 'cinema', desk: 'cinema',
+    words: [
+      'cinema brasileiro', 'cinema nacional', 'filme brasileiro', 'filmes brasileiros', 'longa brasileiro',
+      'producao brasileira', 'producoes brasileiras', 'audiovisual brasileiro', 'ancine', 'cota de tela', 'globo filmes',
+      'fundo setorial do audiovisual', 'spcine', 'riofilme', 'brazilian film*', 'brazilian cinema', 'brazilian director*',
+      'brazilian movie*',
+    ],
+  },
+  {
+    id: 'streaming', label: 'Séries e streaming', short: 'Streaming', parent: 'cinema', desk: 'cinema',
+    words: [
+      'streaming', 'netflix', 'globoplay', 'prime video', 'disney+', 'hbo', 'apple tv', 'paramount+', 'serie de tv',
+      'series de tv', 'minisserie*', 'showrunner*', 'tv series', 'streamer*', 'streaming service*', 'vod',
+    ],
+  },
+  {
+    id: 'premios', label: 'Festivais e prêmios', short: 'Festivais', parent: 'cinema', desk: 'cinema',
+    words: [
+      'oscars', 'premio oscar', 'oscar de melhor', 'indicado ao oscar', 'indicada ao oscar', 'indicados ao oscar',
+      'indicacao ao oscar', 'indicacoes ao oscar', 'academy award*', 'academia de hollywood', 'festival de cannes',
+      'cannes film festival', 'palma de ouro', "palme d'or", 'palme d’or', 'berlinale', 'urso de ouro', 'festival de veneza',
+      'venice film festival', 'leao de ouro', 'sundance', 'toronto film festival', 'globo de ouro', 'golden globe*',
+      'emmy*', 'bafta*', 'festival de gramado', 'festival do rio', 'mostra de sao paulo', 'mostra internacional de cinema',
+      'festival de brasilia', 'e tudo verdade', 'grande otelo', 'sag awards', 'critics choice',
+    ],
+  },
+  {
+    id: 'mercado-av', label: 'Mercado e editais', short: 'Mercado e editais', parent: 'cinema', desk: 'cinema',
+    words: [
+      'bilheteria*', 'box office', 'mercado audiovisual', 'industria audiovisual', 'setor audiovisual',
+      'produtora audiovisual', 'produtoras audiovisuais', 'edital de audiovisual', 'editais de audiovisual',
+      'edital do audiovisual', 'fundo setorial do audiovisual', 'ancine', 'condecine', 'cota de tela', 'lei paulo gustavo',
+      'lei rouanet', 'aldir blanc', 'regulacao do streaming', 'regulacao do vod', 'salas de cinema', 'exibidor*',
+      'distribuidora de filmes', 'greve de roteiristas', 'greve dos atores', 'wga', 'sag-aftra', 'theatrical',
+      'distribution rights', 'greenlight*', 'greenlit', 'production company', 'first-look deal', 'overall deal',
+    ],
   },
   {
     id: 'clima', label: 'Clima e meio ambiente', short: 'Clima',
@@ -136,6 +216,9 @@ export const SECTION_TOPICS = {
   mundo: { BR: ['politica-int'], INT: ['politica-int'] },
   economia: { BR: ['economia-br'], INT: ['economia-int'] },
   mercados: { BR: ['mercados'], INT: ['mercados', 'economia-int'] },
+  tecnologia: { BR: ['tecnologia'], INT: ['tecnologia'] },
+  cinema: { BR: ['cinema'], INT: ['cinema'] },
+  cultura: { BR: [], INT: [] }, // caderno de cultura: só entra o que for cinema/audiovisual
   energia: { BR: ['petroleo'], INT: ['petroleo'] },
   checagem: { BR: ['checagem'], INT: ['checagem'] },
   opiniao: { BR: [], INT: [] },
@@ -149,7 +232,16 @@ export const URL_SECTIONS = [
   { re: /\/(einvestidor|investimentos|mercados|markets|financas)\//i, section: 'mercados' },
   { re: /\/(economia|mercado|business|economy|negocios|agronegocio)\//i, section: 'economia' },
   { re: /\/(verificacao|checamos|fato-ou-fake)\//i, section: 'checagem' },
+  { re: /\/(tecnologia|tec|technology)\//i, section: 'tecnologia' },
+  { re: /\/(cinema|filmes|film|movies)\//i, section: 'cinema' },
 ];
+
+// Feeds de cinema e cultura: cinema e TV entram; fofoca, música, gastronomia e afins continuam fora.
+export const EXCLUDE_CULTURE_URL = /\/(celebridades|famosos|fofoca|bbb\d*|novelas|horoscopo|receitas?|recipes?|loterias|music|musica|gastronomia|games|podcasts?|videos?|newsletters?|gallery|galleries|photos|fotos|puzzles|crosswords?|lifestyle|fashion|moda|beauty|travel|viagem|turismo)\//i;
+
+// Matéria patrocinada ou de ofertas (comum em sites de tecnologia e entretenimento).
+export const PROMO = /(\bdeals?\b|\bon sale\b|% off\b|black friday|cyber monday|prime day|em promo[cç][aã]o|\bcupom\b|\bcupons\b|com desconto|mais barato|achados)/i;
+export const SPONSORED = /(sponsored|patrocinad|publieditorial|conte[uú]do de marca|branded content)/i;
 
 // Matérias fora do escopo de um hub de notícias (esporte, entretenimento, serviço local).
 export const EXCLUDE_URL = /\/(esportes?|futebol|sport|sports|football|celebridades|entretenimento|famosos|horoscopo|receitas?|recipes?|novelas|bbb\d*|casual|pop-arte|tv-e-lazer|lifestyle|travel|viagem|turismo|fashion|moda|beauty|puzzles|crosswords?|gastronomia|kogut|rioshow|loterias|bem-estar|games|culture|film|music|tv-and-radio|books|gardening|family|cars|motoring|health-fitness|luxury|podcasts?|videos?|newsletters?|horoscopes?|obituaries)\//i;
