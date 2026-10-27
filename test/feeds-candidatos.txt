@@ -1,0 +1,43 @@
+# Tecnologia — Brasil
+https://tecnoblog.net/feed/
+https://nucleo.jor.br/feed/
+https://mittechreview.com.br/feed/
+https://www.mobiletime.com.br/feed/
+https://feeds.folha.uol.com.br/tec/rss091.xml
+https://g1.globo.com/rss/g1/tecnologia/
+https://www.estadao.com.br/arc/outboundfeeds/feeds/rss/sections/link/
+# Tecnologia — internacional
+https://www.theverge.com/rss/index.xml
+https://feeds.arstechnica.com/arstechnica/index
+https://www.wired.com/feed/rss
+https://techcrunch.com/feed/
+https://www.technologyreview.com/feed/
+https://restofworld.org/feed/latest
+https://www.404media.co/rss/
+https://feeds.bbci.co.uk/news/technology/rss.xml
+https://www.theguardian.com/technology/rss
+https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml
+https://feeds.bloomberg.com/technology/news.rss
+https://feeds.content.dowjones.io/public/rss/RSSWSJD
+https://www.ft.com/technology?format=rss
+# Cinema e audiovisual — Brasil
+https://telaviva.com.br/feed/
+https://www.gov.br/ancine/pt-br/assuntos/noticias/RSS
+https://revistadecinema.com.br/feed/
+https://www.papodecinema.com.br/feed/
+https://www.omelete.com.br/rss
+https://feeds.folha.uol.com.br/ilustrada/rss091.xml
+https://www.estadao.com.br/arc/outboundfeeds/feeds/rss/sections/cultura/
+https://g1.globo.com/rss/g1/pop-arte/
+https://spcine.com.br/feed/
+# Cinema e audiovisual — internacional
+https://variety.com/feed/
+https://www.hollywoodreporter.com/feed/
+https://deadline.com/feed/
+https://www.indiewire.com/feed/
+https://nofilmschool.com/rss.xml
+https://filmmakermagazine.com/feed/
+https://www.thewrap.com/feed/
+https://www.theguardian.com/film/rss
+https://rss.nytimes.com/services/xml/rss/nyt/Movies.xml
+https://www.screendaily.com/full-rss
