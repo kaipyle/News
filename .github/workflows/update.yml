@@ -2,15 +2,13 @@ name: Atualizar notícias
 # Coleta os feeds e publica o app no GitHub Pages.
 # Requer: Settings → Pages → Source: "GitHub Actions".
 #
-# O agendamento do GitHub atrasa e às vezes nem dispara. Por isso o ritmo de
-# 15 min vem do job "proxima": ele espera o fim do intervalo e dispara a rodada
-# seguinte. O "schedule" fica só como rede de segurança, para religar a corrente.
-# Para parar: desative o workflow na aba Actions, ou crie a variável
-# ATUALIZACAO_CONTINUA com o valor "off" em Settings → Secrets and variables → Actions.
+# Roda pelo agendamento do GitHub, a cada 30 min. Cada rodada leva uns 2 minutos de máquina
+# e termina; nada fica esperando. O GitHub pode atrasar ou pular horários do agendamento.
+# Repositório público: os minutos de Actions são gratuitos.
 
 on:
   schedule:
-    - cron: '41 * * * *' # religa a corrente se ela parar
+    - cron: '7,37 * * * *'
   workflow_dispatch:
   push:
     branches: [main]
@@ -19,7 +17,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
-  actions: write # disparar a próxima rodada e manter o workflow ligado
+  actions: write # só o passo que mantém o workflow ligado
 
 # Uma rodada por vez; se chegar mais de uma pedida, só a mais recente espera na fila.
 concurrency:
@@ -56,27 +54,11 @@ jobs:
         uses: actions/deploy-pages@v4
       - name: Manter o workflow ativo
         # Em repositório público, o GitHub desliga workflows agendados após 60 dias sem commits.
-        if: github.event_name != 'push'
+        if: github.event_name == 'schedule'
         continue-on-error: true
         run: |
           if [ "$(date -u +%H%M)" \< "0030" ]; then
             gh api -X PUT "repos/${{ github.repository }}/actions/workflows/update.yml/enable"
           fi
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-  proxima:
-    # Roda também quando a coleta falha, para a corrente não parar; não roda se a rodada for cancelada.
-    needs: publicar
-    if: ${{ !cancelled() && github.event_name != 'push' && vars.ATUALIZACAO_CONTINUA != 'off' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Esperar o intervalo e disparar a próxima coleta
-        run: |
-          inicio=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .run_started_at)
-          espera=$(( 900 - 20 - ($(date +%s) - $(date -d "$inicio" +%s)) ))
-          if [ "$espera" -gt 0 ]; then sleep "$espera"; fi
-          gh workflow run update.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
         env:
           GH_TOKEN: ${{ github.token }}

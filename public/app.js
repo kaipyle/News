@@ -898,7 +898,7 @@ function openHelp() {
     <p><span class="now">Ao vivo</span> cobertura em tempo real (o tema <strong>Última hora</strong> mostra só as últimas 3 horas). <span class="tag">Opinião</span> coluna, editorial ou análise. <span class="pay">${icon('lock')}</span> o veículo cobra assinatura.</p>
     <p>Reuters e AP não têm feed público: os títulos chegam pelo Google Notícias, sem autor. The Economist não assina textos por política própria.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Atualização</h3>
-    <p>As fontes são lidas a cada 15 minutos. Última coleta: ${esc(updated)}. A lista se atualiza sozinha; para buscar na hora, puxe a tela para baixo no topo.</p>
+    <p>As fontes são lidas a cada 30 minutos (o GitHub, que roda a coleta, às vezes atrasa). Última coleta: ${esc(updated)}. A lista se atualiza sozinha; para buscar na hora, puxe a tela para baixo no topo.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Minhas assinaturas</h3>
     <p>No <strong>menu</strong> (botão ☰ no topo), toque em <strong>Ocultar pagos</strong> para esconder os jornais pagos que você não assina; toque de novo para mostrar todos. Ele fica ligado até você desligar, em qualquer aba ou tema. Para dizer quais jornais você assina, use o botão <strong>Assinaturas</strong> do aviso, a seção no topo dos <strong>Filtros</strong> ou <strong>Fontes</strong>, no menu. Fica salvo neste aparelho: no computador e no celular a escolha é feita separadamente.</p>
     <h3 class="lane-tag" style="margin:20px 0 8px">Tradução</h3>
